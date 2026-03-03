@@ -38,3 +38,35 @@ export const fetchMovies = async (query?: string) => {
     throw error; 
   }
 };
+
+
+export const fetchMovieDetails = async (movieId: string | string[]) => {
+  try {
+    const response = await fetch(`${tmdb_config.baseUrl}/movie/${movieId}`, {
+      headers: tmdb_config.headers
+    });
+
+    if (!response.ok) {
+      throw new Error(`TMDB API Error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching movie details:', error);
+    throw error;
+  }
+};
+
+
+export const fetchMoviesByPath = async (path: string) => {
+  try {
+    const response = await fetch(`${tmdb_config.baseUrl}${path}`, {
+      headers: tmdb_config.headers
+    });
+    const data = await response.json();
+    return data.results;
+  } catch (error) {
+    console.error(`Error fetching from ${path}:`, error);
+    return [];
+  }
+};
