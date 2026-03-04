@@ -40,17 +40,14 @@ export const fetchMovies = async (query?: string) => {
 };
 
 
-export const fetchMovieDetails = async (movieId: string | string[]) => {
+export const fetchMovieDetails = async (id: string | string[]) => {
   try {
-    const response = await fetch(`${tmdb_config.baseUrl}/movie/${movieId}`, {
+    // We appended "?append_to_response=videos" to grab the trailers in the exact same request!
+    const response = await fetch(`${tmdb_config.baseUrl}/movie/${id}?append_to_response=videos`, {
       headers: tmdb_config.headers
     });
-
-    if (!response.ok) {
-      throw new Error(`TMDB API Error: ${response.status}`);
-    }
-
-    return await response.json();
+    const data = await response.json();
+    return data;
   } catch (error) {
     console.error('Error fetching movie details:', error);
     throw error;
