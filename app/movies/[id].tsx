@@ -30,6 +30,8 @@ export default function MovieDetailScreen() {
     queryFn: () => fetchMovieDetails(id),
   });
 
+  console.log("Movie Details:", movie); // Debugging log to check the structure of the movie data
+
   const onStateChange = useCallback((state: string) => {
     if (state === 'ended') {
       setPlaying(false);
@@ -117,6 +119,22 @@ export default function MovieDetailScreen() {
             {movie.title}
           </Text>
 
+          {/* --- NEW: GENRE PILLS --- */}
+          {movie.genres && (
+            <View className="flex-row flex-wrap gap-2 mb-4">
+              {movie.genres.map((genre: any) => (
+                <View 
+                  key={genre.id} 
+                  className="bg-surface px-3 py-1.5 rounded-full border border-[#1A2235]"
+                >
+                  <Text className="text-[#8899B6] text-xs font-bold tracking-wider">
+                    {genre.name}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Metadata Row */}
           <View className="flex-row items-center mb-6">
             <Ionicons name="star" size={18} color="#00E5FF" />
@@ -156,7 +174,7 @@ export default function MovieDetailScreen() {
             </Pressable>
           </View>
 
-          {/* --- NEW: SECONDARY ACTION ICONS --- */}
+          {/* SECONDARY ACTION ICONS */}
           <View className="flex-row justify-around py-4 mb-6 border-t border-b border-[#1A2235]">
             <Pressable onPress={() => setShowDownloadModal(true)} className="items-center">
               <Ionicons name="download-outline" size={26} color="#F8F9FA" />
@@ -181,26 +199,21 @@ export default function MovieDetailScreen() {
             {movie.overview || "No synopsis available for this title."}
           </Text>
 
+          {/* USER REVIEWS */}
           <View className="mt-8 border-t border-[#1A2235] pt-8">
             <Text className="text-primaryText text-xl font-bold mb-4">User Reviews</Text>
             
-            {/* Check if there are reviews, and slice(0, 5) so we only show the top 5! */}
             {movie.reviews && movie.reviews.results.length > 0 ? (
               movie.reviews.results.slice(0, 5).map((review: any) => (
                 <View key={review.id} className="bg-surface p-5 rounded-2xl mb-4 border border-[#1A2235]">
-                  
-                  {/* Reviewer Header */}
                   <View className="flex-row items-center mb-3">
-                    {/* Fake Avatar using their Initial */}
                     <View className="w-10 h-10 bg-[#1A2235] rounded-full items-center justify-center mr-3">
                       <Text className="text-[#00E5FF] font-bold text-lg">
                         {review.author.charAt(0).toUpperCase()}
                       </Text>
                     </View>
-                    
                     <View className="flex-1">
                       <Text className="text-primaryText font-bold text-base">{review.author}</Text>
-                      {/* TMDB sometimes provides the rating the user gave it */}
                       {review.author_details?.rating && (
                         <View className="flex-row items-center mt-0.5">
                           <Ionicons name="star" size={12} color="#00E5FF" />
@@ -211,20 +224,12 @@ export default function MovieDetailScreen() {
                       )}
                     </View>
                   </View>
-
-                  {/* Review Content */}
-                  <Text 
-                    className="text-[#8899B6] text-sm leading-6" 
-                    // numberOfLines prevents a 10-paragraph essay from ruining your screen layout
-                    numberOfLines={4} 
-                  >
+                  <Text className="text-[#8899B6] text-sm leading-6" numberOfLines={4}>
                     {review.content}
                   </Text>
-                  
                 </View>
               ))
             ) : (
-              // Empty State for older/indie movies with no reviews
               <View className="bg-surface p-6 rounded-2xl items-center border border-[#1A2235]">
                 <Ionicons name="chatbubble-ellipses-outline" size={32} color="#8899B6" className="mb-2" />
                 <Text className="text-[#8899B6] text-center">No reviews yet. Be the first to share your thoughts!</Text>
@@ -241,7 +246,6 @@ export default function MovieDetailScreen() {
           <View className="bg-surface w-full rounded-3xl p-6 border border-[#1A2235]">
             <Text className="text-white text-xl font-bold mb-4">Download Quality</Text>
             
-            {/* Options */}
             {[
               { label: 'High (1080p)', size: '2.4 GB' },
               { label: 'Standard (720p)', size: '1.2 GB' },
@@ -257,7 +261,6 @@ export default function MovieDetailScreen() {
               </Pressable>
             ))}
 
-            {/* Cancel Button */}
             <Pressable onPress={() => setShowDownloadModal(false)} className="mt-6 bg-[#1A2235] p-4 rounded-xl items-center">
               <Text className="text-white font-bold text-base">Cancel</Text>
             </Pressable>

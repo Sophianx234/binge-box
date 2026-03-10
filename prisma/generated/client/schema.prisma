@@ -1,0 +1,27 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/client" // <-- Add this exact line
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          Int          @id @default(autoincrement())
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now())
+  savedMovies SavedMovie[]
+}
+
+model SavedMovie {
+  id         Int     @id @default(autoincrement())
+  tmdbId     Int
+  title      String
+  posterPath String?
+  userId     Int
+  user       User    @relation(fields: [userId], references: [id])
+}
