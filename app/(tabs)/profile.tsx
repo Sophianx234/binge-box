@@ -1,17 +1,29 @@
 import { View, Text, ScrollView, Pressable, Image, Switch } from 'react-native';
-import React, { useState } from 'react';
+import React, { ReactNode, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-
+import { useMovieStore } from '@/store/store';
+import { useRouter } from 'expo-router';
+export type SettingsRowProps = {
+  icon:string,
+  title:string,
+  value:string,
+  showChevron:boolean,
+  isDestructive?:boolean,
+  nav?:'/(tabs)/saved'   | '/movies/index' | '/movies/favorites'
+}
 export default function ProfileScreen() {
   // A simple state for a dummy "Dark Mode" or "Notifications" toggle
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const savedMovies = useMovieStore((state) => state.savedMovies);
+  const router = useRouter();
 
   // A reusable component for the settings rows so we don't repeat code!
-  const SettingsRow = ({ icon, title, value, showChevron = true, isDestructive = false }: any) => (
-    <Pressable className="flex-row items-center py-4 border-b border-[#1A2235]">
+  const SettingsRow = ({ icon, title, value, showChevron = true, isDestructive = false, nav }:SettingsRowProps ) => (
+    
+    <Pressable className="flex-row items-center py-4 border-b border-[#1A2235]" onPress={()=> nav && router.push(nav)}>
       <View className={`w-8 h-8 rounded-full items-center justify-center mr-4 ${isDestructive ? 'bg-red-500/10' : 'bg-[#1A2235]'}`}>
-        <Ionicons name={icon} size={18} color={isDestructive ? '#EF4444' : '#00E5FF'} />
+        <Ionicons name={icon as any} size={18} color={isDestructive ? '#EF4444' : '#00E5FF'} />
       </View>
       <Text className={`flex-1 font-medium text-base ${isDestructive ? 'text-red-500' : 'text-primaryText'}`}>
         {title}
@@ -20,6 +32,7 @@ export default function ProfileScreen() {
       {showChevron && <Ionicons name="chevron-forward" size={18} color="#8899B6" className="opacity-50" />}
     </Pressable>
   );
+
 
   return (
     <SafeAreaView className="bg-background flex-1">
@@ -59,7 +72,7 @@ export default function ProfileScreen() {
             <Text className="text-[#8899B6] text-xs mt-1">Watched</Text>
           </View>
           <View className="items-center flex-1 border-r border-[#1A2235]">
-            <Text className="text-primaryText font-bold text-xl">34</Text>
+            <Text className="text-primaryText font-bold text-xl">{savedMovies.length}</Text>
             <Text className="text-[#8899B6] text-xs mt-1">My List</Text>
           </View>
           <View className="items-center flex-1">
@@ -72,9 +85,9 @@ export default function ProfileScreen() {
         <View className="mb-6">
           <Text className="text-primaryText font-bold text-lg mb-2">Content & Activity</Text>
           <View className="bg-surface px-4 rounded-2xl">
-            <SettingsRow icon="bookmark" title="My List" />
-            <SettingsRow icon="download" title="Downloads" value="2.4 GB" />
-            <SettingsRow icon="heart" title="Favorite Genres" value="Anime, Action" showChevron={false} />
+            <SettingsRow icon="bookmark" title="My List" nav="/(tabs)/saved" />
+            <SettingsRow icon="download" title="Downloads" value="2.4 GB" nav="/movies/downloads" />
+            <SettingsRow icon="heart" title="Favorite Genres" value="Anime, Action" showChevron={false} nav="/movies/favorites" />
           </View>
         </View>
 
