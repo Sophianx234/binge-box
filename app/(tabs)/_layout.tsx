@@ -49,12 +49,21 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="downloads"
+        options={{
+          title: 'Downloads',
+          tabBarIcon: ({ color, size }) => <IonIcons name="arrow-down-circle-outline" color={color} size={size + 2} />,
+        }}
+      />
+
+      <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => <IonIcons name="person-outline" color={color} size={size + 2} />,
         }}
       />
+      
     </Tabs>
   );
 }

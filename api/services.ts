@@ -43,7 +43,7 @@ export const fetchMovies = async (query?: string) => {
 export const fetchMovieDetails = async (id: string | string[]) => {
   try {
     // We appended "?append_to_response=videos" to grab the trailers in the exact same request!
-    const response = await fetch(`${tmdb_config.baseUrl}/movie/${id}?append_to_response=videos`, {
+    const response = await fetch(`${tmdb_config.baseUrl}/movie/${id}?append_to_response=videos,reviews`, {
       headers: tmdb_config.headers
     });
     const data = await response.json();

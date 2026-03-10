@@ -8,9 +8,9 @@ export type SettingsRowProps = {
   icon:string,
   title:string,
   value:string,
-  showChevron:boolean,
+  showChevron?:boolean,
   isDestructive?:boolean,
-  nav?:'/(tabs)/saved'   | '/movies/index' | '/movies/favorites'
+  nav?:'/(tabs)/saved'   | '/(tabs)/downloads' | '/movies/favorites'
 }
 export default function ProfileScreen() {
   // A simple state for a dummy "Dark Mode" or "Notifications" toggle
@@ -86,7 +86,7 @@ export default function ProfileScreen() {
           <Text className="text-primaryText font-bold text-lg mb-2">Content & Activity</Text>
           <View className="bg-surface px-4 rounded-2xl">
             <SettingsRow icon="bookmark" title="My List" nav="/(tabs)/saved" />
-            <SettingsRow icon="download" title="Downloads" value="2.4 GB" nav="/movies/downloads" />
+            <SettingsRow icon="download" title="Downloads" value="2.4 GB" nav="/(tabs)/downloads" />
             <SettingsRow icon="heart" title="Favorite Genres" value="Anime, Action" showChevron={false} nav="/movies/favorites" />
           </View>
         </View>
