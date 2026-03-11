@@ -8,8 +8,13 @@ const tmdb_config = {
   }
 };
 
- 
 
+export const getHeaders = (token: string) => ({
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`,
+});
+ 
+const url = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 // 1. Make the query optional by using the "?" in TypeScript
 export const fetchMovies = async (query?: string) => {
   try {
@@ -66,4 +71,115 @@ export const fetchMoviesByPath = async (path: string) => {
     console.error(`Error fetching from ${path}:`, error);
     return [];
   }
+};
+
+
+
+// Fetch all saved movies
+export const getMyLibrary = async (token: string) => {
+  const res = await fetch(`${url}/movies`, {
+    headers: getHeaders(token),
+  });
+  if (!res.ok) throw new Error('Failed to fetch library');
+  return res.json();
+};
+
+// Save a movie to watchlist (The initial Save)
+export const saveMovie = async (token: string, movieData: any) => {
+  const res = await fetch(`${url}/movies`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify(movieData),
+  });
+  return res.json();
+};
+
+
+
+// Toggle Favorite (The Heart Icon)
+export const toggleFavorite = async (token: string, tmdbId: number) => {
+  const res = await fetch(`${url}/movies/favorite`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify({ tmdbId }),
+  });
+  return res.json();
+};
+
+// Rate a Movie (The Stars)
+export const rateMovie = async (token: string, tmdbId: number, rating: number) => {
+  const res = await fetch(`${url}/movies/rate`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify({ tmdbId, rating }),
+  });
+  return res.json();
+};
+
+
+// Mark as Downloaded
+export const markAsDownloaded = async (token: string, movieData: any) => {
+  const res = await fetch(`${url}/movies/download`, {
+    method: 'POST',
+    headers: getHeaders(token),
+    body: JSON.stringify(movieData),
+  });
+  return res.json();
+};
+
+// Add this to your API file
+export const registerUser = async (userData: any) => {
+  
+  const response = await fetch(`${url}/users/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData),
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    // This catches the exact errors we threw in our Express controller!
+    throw new Error(data.error || 'Failed to register');
+  }
+
+  return data;
+};
+
+
+export const loginUser = async (credentials: any) => {
+  
+  const response = await fetch(`${url}/users/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    // Catches the "Invalid email or password" error from your backend
+    throw new Error(data.error || 'Failed to log in');
+  }
+
+  return data;
+};
+
+
+export const requestPasswordReset = async (email: string) => {
+  
+  // Note: Adjust the endpoint path if your router uses something different!
+  const response = await fetch(`${url}/users/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json();
+  
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to send reset link');
+  }
+
+  return data;
 };

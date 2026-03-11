@@ -1,8 +1,11 @@
 import { create } from 'zustand';
-
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store'; // <-- Added SecureStore
 
+// ==========================================
+// 1. BEAR STORE (Testing/Boilerplate)
+// ==========================================
 export interface BearState {
   bears: number;
   increasePopulation: () => void;
@@ -17,10 +20,9 @@ export const useStore = create<BearState>((set) => ({
   updateBears: (newBears) => set({ bears: newBears }),
 }));
 
-
-
-// 1. We define the exact shape of the data we want to save. 
-// We don't save the whole TMDB object to save memory!
+// ==========================================
+// 2. MOVIE STORE (Persisted with AsyncStorage)
+// ==========================================
 export interface SavedMovie {
   id: number;
   title: string;
@@ -28,38 +30,62 @@ export interface SavedMovie {
   release_date: string;
 }
 
-// 2. Define the Store's State and Actions
 interface MovieState {
   savedMovies: SavedMovie[];
   toggleSaveMovie: (movie: SavedMovie) => void;
 }
 
-// 3. Create the Store with the 'persist' middleware
 export const useMovieStore = create<MovieState>()(
   persist(
     (set) => ({
-      savedMovies: [], // Initial state is an empty array
-      
-      toggleSaveMovie: (movie) => set((state) => {
-        // Check if the movie already exists in the array
-        const isSaved = state.savedMovies.some((m) => m.id === movie.id);
-        
-        if (isSaved) {
-          // If it's already saved, remove it (filter it out)
-          return {
-            savedMovies: state.savedMovies.filter((m) => m.id !== movie.id),
-          };
-        } else {
-          // If it's not saved, add it to the beginning of the array so new saves appear first
-          return {
-            savedMovies: [movie, ...state.savedMovies],
-          };
-        }
-      }),
+      savedMovies: [],
+      toggleSaveMovie: (movie) =>
+        set((state) => {
+          const isSaved = state.savedMovies.some((m) => m.id === movie.id);
+          if (isSaved) {
+            return { savedMovies: state.savedMovies.filter((m) => m.id !== movie.id) };
+          } else {
+            return { savedMovies: [movie, ...state.savedMovies] };
+          }
+        }),
     }),
     {
-      name: 'bingebox-movie-storage', // The unique key used in AsyncStorage
-      storage: createJSONStorage(() => AsyncStorage), // Tells Zustand to use React Native's storage
+      name: 'bingebox-movie-storage',
+      storage: createJSONStorage(() => AsyncStorage),
     }
   )
 );
+
+// ==========================================
+// 3. AUTH STORE (Secured with expo-secure-store)
+// ==========================================
+interface AuthState {
+  token: string | null;
+  setToken: (token: string) => Promise<void>;
+  logout: () => Promise<void>;
+  checkTokenAtStartup: () => Promise<void>; // Added this to load the token when the app opens!
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
+  token: null,
+
+  // Save token to state AND secure hardware
+  setToken: async (newToken: string) => {
+    await SecureStore.setItemAsync('userToken', newToken);
+    set({ token: newToken });
+  },
+
+  // Remove token from state AND secure hardware
+  logout: async () => {
+    await SecureStore.deleteItemAsync('userToken');
+    set({ token: null });
+  },
+
+  // Call this ONCE when your _layout.tsx mounts to check if they are already logged in
+  checkTokenAtStartup: async () => {
+    const savedToken = await SecureStore.getItemAsync('userToken');
+    if (savedToken) {
+      set({ token: savedToken });
+    }
+  },
+}));
