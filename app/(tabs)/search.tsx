@@ -34,7 +34,7 @@ export default function SearchScreen() {
               
               <TextInput 
                 className="flex-1 text-primaryText text-base"
-                placeholder="Search movies..."
+                placeholder="Search movies, shows..."
                 placeholderTextColor="#8899B6"
                 selectionColor="#00E5FF"
                 value={searchQuery}
@@ -66,7 +66,7 @@ export default function SearchScreen() {
             {debouncedQuery.length === 0 && (
               <View className="flex-1 justify-center items-center opacity-50 pb-20">
                 <Ionicons name="film-outline" size={64} color="#8899B6" className="mb-4" />
-                <Text className="text-[#8899B6] text-lg font-bold">Find your next favorite movie</Text>
+                <Text className="text-[#8899B6] text-lg font-bold">Find your next favorite watch</Text>
               </View>
             )}
 
@@ -77,14 +77,10 @@ export default function SearchScreen() {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
-                
-                // 1. THE MAGIC PROP: Turns the list into a grid
                 numColumns={3}
-                // Important: adding columnWrapperStyle is necessary to space the columns out!
                 columnWrapperStyle={{ gap: 12 }} 
                 contentContainerStyle={{ gap: 16, paddingBottom: 20 }}
                 
-                // 2. We moved the header *inside* a full-width View so it doesn't mess up the columns
                 ListHeaderComponent={
                   <View className="w-full mb-2">
                     <Text className="text-primaryText text-lg font-bold">
@@ -95,29 +91,41 @@ export default function SearchScreen() {
                 
                 ListEmptyComponent={
                   <Text className="text-[#8899B6] text-center mt-6 w-full">
-                    No movies found.
+                    No results found.
                   </Text>
                 }
                 
-                renderItem={({ item }) => (
-                  // 3. Grid Item Layout: Takes up exactly 1 fraction of the space, stacked vertically
-                  <TouchableOpacity 
-                    onPress={() => router.push(`/movies/${item.id}`)}
-                    className="flex-1 flex-col max-w-[31%]" // max-w ensures the last row doesn't stretch weirdly if there are only 1 or 2 movies left
-                  >
-                    <Image 
-                      source={{ uri: item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : undefined }}
-                      // aspect-[2/3] ensures the poster is perfectly proportioned before it even loads
-                      className="w-full aspect-[2/3] bg-surface rounded-lg mb-2"
-                      resizeMode="cover"
-                    />
-                    
-                    {/* Centered, single-line title */}
-                    <Text className="text-primaryText font-bold text-xs text-center" numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                renderItem={({ item }) => {
+                  // 1. DYNAMIC TYPE CHECK: Determine if it is a movie or tv show
+                  const mediaType = item.media_type || (item.first_air_date ? 'tv' : 'movie');
+
+                  return (
+                    <TouchableOpacity 
+                      onPress={() => {
+                        // 2. DYNAMIC ROUTING: Pass both the ID and the Type
+                        router.push({
+                          pathname: '/movies/[id]',
+                          params: { 
+                            id: item.id, 
+                            type: mediaType 
+                          }
+                        });
+                      }}
+                      className="flex-1 flex-col max-w-[31%]" 
+                    >
+                      <Image 
+                        source={{ uri: item.poster_path ? `https://image.tmdb.org/t/p/w200${item.poster_path}` : undefined }}
+                        className="w-full aspect-[2/3] bg-surface rounded-lg mb-2"
+                        resizeMode="cover"
+                      />
+                      
+                      {/* 3. DYNAMIC TEXT: Supports both title (movies) and name (TV) */}
+                      <Text className="text-primaryText font-bold text-xs text-center" numberOfLines={1}>
+                        {item.title || item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                }}
               />
             )}
           </View>

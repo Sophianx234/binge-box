@@ -55,9 +55,10 @@ export const uploadAvatarToServer = async (token: string, imageUri: string) => {
 
 export const fetchMovies = async (query?: string) => {
   try {
+    // 1. Switch to 'multi' search and 'trending/all'
     const endpoint = query 
-      ? `/search/movie?query=${encodeURIComponent(query)}` 
-      : `/discover/movie?sort_by=popularity.desc`; 
+      ? `/search/multi?query=${encodeURIComponent(query)}` 
+      : `/trending/all/week`; 
 
     const response = await fetch(`${tmdb_config.baseUrl}${endpoint}`, {
       headers: tmdb_config.headers
@@ -68,23 +69,93 @@ export const fetchMovies = async (query?: string) => {
     }
 
     const data = await response.json();
-    return data.results; 
+
+    // 2. TMDB 'multi' search also returns actors/directors. 
+    // We filter them out so we only return playable media (Movies & TV).
+    const filteredResults = data.results.filter(
+      (item: any) => item.media_type === 'movie' || item.media_type === 'tv'
+    );
+
+    return filteredResults; 
 
   } catch (error) {
-    console.error('Error fetching movies:', error);
+    console.error('Error fetching media:', error);
     throw error; 
   }
 };
 
-export const fetchMovieDetails = async (id: string | string[]) => {
+
+export const fetchCredits = async (id: string | number, type: 'movie' | 'tv' = 'movie') => {
   try {
-    const response = await fetch(`${tmdb_config.baseUrl}/movie/${id}?append_to_response=videos,reviews`, {
+    const response = await fetch(`${tmdb_config.baseUrl}/${type}/${id}/credits`, {
+      headers: tmdb_config.headers
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch credits');
+    
+    const data = await response.json();
+
+    // 1. Get the Actors (Cast)
+    // We slice(0, 10) so we only get the top 10 main actors, not the 50 background extras!
+    const actors = data.cast?.slice(0, 10) || [];
+
+    // 2. Get the Directors (Crew)
+    // We filter the crew array to only find the people with the job title "Director"
+    const directors = data.crew?.filter((member: any) => member.job === 'Director') || [];
+
+    return { actors, directors };
+
+  } catch (error) {
+    console.error(`Error fetching ${type} credits:`, error);
+    throw error;
+  }
+};
+
+export const fetchGenres = async (type: 'movie' | 'tv' = 'movie') => {
+  try {
+    const response = await fetch(`${tmdb_config.baseUrl}/genre/${type}/list`, {
+      headers: tmdb_config.headers
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch genres');
+    
+    const data = await response.json();
+    return data.genres; // Returns an array like: [{ id: 28, name: "Action" }, ...]
+
+  } catch (error) {
+    console.error(`Error fetching ${type} genres:`, error);
+    throw error;
+  }
+};
+
+export const fetchSimilar = async (id: string | number, type: 'movie' | 'tv' = 'movie') => {
+  try {
+    // TMDB has both /similar and /recommendations. /recommendations usually gives better results!
+    const response = await fetch(`${tmdb_config.baseUrl}/${type}/${id}/recommendations`, {
+      headers: tmdb_config.headers
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch similar media');
+    
+    const data = await response.json();
+    return data.results;
+
+  } catch (error) {
+    console.error(`Error fetching similar ${type}:`, error);
+    throw error;
+  }
+};
+
+export const fetchMovieDetails = async (id: string | string[], type: string = 'movie') => {
+  try {
+    // We replace the hardcoded '/movie/' with `/${type}/`
+    const response = await fetch(`${tmdb_config.baseUrl}/${type}/${id}?append_to_response=videos,reviews`, {
       headers: tmdb_config.headers
     });
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching movie details:', error);
+    console.error(`Error fetching ${type} details:`, error);
     throw error;
   }
 };
