@@ -1,9 +1,12 @@
-import { View, Text, ScrollView, Pressable, Image, Switch, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Image, Switch, Alert, ActivityIndicator } from 'react-native';
 import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMovieStore, useAuthStore } from '@/store/store'; 
+import { useAuthStore } from '@/store/store'; 
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query'; 
+import { getMyLibrary, uploadAvatarToServer } from '@/api/services';
+import * as ImagePicker from 'expo-image-picker'; 
 
 export type SettingsRowProps = {
   icon: string;
@@ -11,20 +14,66 @@ export type SettingsRowProps = {
   value?: string; 
   showChevron?: boolean;
   isDestructive?: boolean;
-  nav?: '/(tabs)/saved' | '/(tabs)/downloads' | '/movies/favorites';
+  nav?: any; 
   onPress?: () => void; 
 };
 
 export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const savedMovies = useMovieStore((state) => state.savedMovies);
+  const [isUploading, setIsUploading] = useState(false);
   
-  // 1. Grab BOTH the logout function AND the user object from Zustand!
-  const { logout, user } = useAuthStore((state) => ({
+  // --- NEW STATE FOR THEME DROPDOWN ---
+  const [theme, setTheme] = useState('Dark');
+  const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+  
+  const { logout, user, token, updateUser } = useAuthStore((state) => ({
     logout: state.logout,
-    user: state.user
+    user: state.user,
+    token: state.token,
+    updateUser: state.updateUser 
   }));
   const router = useRouter();
+
+  const { data: libraryData = [] } = useQuery({
+    queryKey: ['myLibrary'],
+    queryFn: () => getMyLibrary(token as string),
+    enabled: !!token,
+  });
+
+  const savedCount = Array.isArray(libraryData) 
+    ? libraryData.filter((m: any) => m.inWatchlist).length 
+    : 0;
+
+  const pickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (permissionResult.status !== 'granted') {
+        Alert.alert("Permission Required", "You need to allow access to your photos to change your profile picture.");
+        return; 
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+        allowsEditing: true, 
+        aspect: [1, 1], 
+        quality: 0.5, 
+      });
+
+      if (!result.canceled) {
+        setIsUploading(true); 
+        const selectedUri = result.assets[0].uri;
+        
+        const updatedUser = await uploadAvatarToServer(token as string, selectedUri);
+        await updateUser(updatedUser);
+      }
+    } catch (error) {
+      console.log("Error picking image:", error);
+      Alert.alert("Upload Failed", "Something went wrong while uploading your picture.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(
@@ -59,7 +108,7 @@ export default function ProfileScreen() {
         {title}
       </Text>
       {value && <Text className="text-[#8899B6] mr-2">{value}</Text>}
-      {showChevron && <Ionicons name="chevron-forward" size={18} color="#8899B6" className="opacity-50" />}
+      {showChevron && <Ionicons name={isThemeDropdownOpen && title === 'App Theme' ? 'chevron-down' : 'chevron-forward'} size={18} color="#8899B6" className="opacity-50" />}
     </Pressable>
   );
 
@@ -69,18 +118,23 @@ export default function ProfileScreen() {
         
         {/* --- HEADER: USER INFO --- */}
         <View className="items-center mt-6 mb-8">
-          <View className="relative">
+          <Pressable onPress={pickImage} disabled={isUploading} className="relative">
             <Image 
-              // 2. You can even make the avatar dynamic later if your backend supports it!
               source={{ uri: user?.avatar || 'https://i.pravatar.cc/150?img=11' }} 
-              className="w-24 h-24 rounded-full border-2 border-[#00E5FF]"
+              className={`w-28 h-28 rounded-full border-4 border-[#00E5FF] ${isUploading ? 'opacity-40' : 'opacity-100'}`}
             />
-            <Pressable className="absolute bottom-0 right-0 bg-[#00E5FF] w-8 h-8 rounded-full items-center justify-center border-2 border-background">
-              <Ionicons name="pencil" size={14} color="#000000" />
-            </Pressable>
-          </View>
+            {!isUploading && (
+              <View className="absolute bottom-0 right-0 bg-[#00E5FF] p-2 rounded-full border-2 border-background shadow-sm">
+                <Ionicons name="camera" size={18} color="#000000" />
+              </View>
+            )}
+            {isUploading && (
+              <View className="absolute inset-0 items-center justify-center">
+                <ActivityIndicator size="small" color="#00E5FF" />
+              </View>
+            )}
+          </Pressable>
           
-          {/* 3. Display the actual User's Name and Email */}
           <Text className="text-primaryText text-2xl font-bold mt-4 capitalize">
             {user?.name || 'Guest User'}
           </Text>
@@ -100,7 +154,7 @@ export default function ProfileScreen() {
             <Text className="text-[#8899B6] text-xs mt-1">Watched</Text>
           </View>
           <View className="items-center flex-1 border-r border-[#1A2235]">
-            <Text className="text-primaryText font-bold text-xl">{savedMovies.length}</Text>
+            <Text className="text-primaryText font-bold text-xl">{savedCount}</Text>
             <Text className="text-[#8899B6] text-xs mt-1">My List</Text>
           </View>
           <View className="items-center flex-1">
@@ -115,15 +169,16 @@ export default function ProfileScreen() {
           <View className="bg-surface px-4 rounded-2xl">
             <SettingsRow icon="bookmark" title="My List" nav="/(tabs)/saved" />
             <SettingsRow icon="download" title="Downloads" value="2.4 GB" nav="/(tabs)/downloads" />
-            <SettingsRow icon="heart" title="Favorite Genres" value="Anime, Action" showChevron={false} nav="/movies/favorites" />
+            <SettingsRow icon="heart" title="My Favorites" showChevron={true} nav="/(tabs)/favorites" />
           </View>
         </View>
 
         <View className="mb-6">
           <Text className="text-primaryText font-bold text-lg mb-2">App Settings</Text>
           <View className="bg-surface px-4 rounded-2xl">
-            <SettingsRow icon="person" title="Account Details" />
-            <SettingsRow icon="card" title="Subscription" value="Active" />
+            <SettingsRow icon="person" title="Account Details" nav='/account'/>
+            {/* CHANGED: Now displays "Pro" instead of "Active" */}
+            <SettingsRow icon="card" title="Subscription" value="Pro" nav='/subscriptions' />
             
             <View className="flex-row items-center py-4 border-b border-[#1A2235]">
               <View className="w-8 h-8 rounded-full bg-[#1A2235] items-center justify-center mr-4">
@@ -138,7 +193,35 @@ export default function ProfileScreen() {
               />
             </View>
             
-            <SettingsRow icon="color-palette" title="App Theme" value="Dark" />
+            {/* DROPDOWN TRIGGER */}
+            <SettingsRow 
+              icon="color-palette" 
+              title="App Theme" 
+              value={theme} 
+              onPress={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)} 
+            />
+
+            {/* EXPANDABLE DROPDOWN MENU */}
+            {isThemeDropdownOpen && (
+              <View className="bg-[#1A2235] mt-1 mb-4 rounded-xl overflow-hidden border border-[#00E5FF]/20">
+                <Pressable 
+                  onPress={() => { setTheme('Dark'); setIsThemeDropdownOpen(false); }}
+                  className="flex-row items-center justify-between p-4 border-b border-background"
+                >
+                  <Text className={`text-base font-medium ${theme === 'Dark' ? 'text-[#00E5FF]' : 'text-[#8899B6]'}`}>Dark</Text>
+                  {theme === 'Dark' && <Ionicons name="checkmark-circle" size={20} color="#00E5FF" />}
+                </Pressable>
+                
+                <Pressable 
+                  onPress={() => { setTheme('Light'); setIsThemeDropdownOpen(false); }}
+                  className="flex-row items-center justify-between p-4"
+                >
+                  <Text className={`text-base font-medium ${theme === 'Light' ? 'text-[#00E5FF]' : 'text-[#8899B6]'}`}>Light</Text>
+                  {theme === 'Light' && <Ionicons name="checkmark-circle" size={20} color="#00E5FF" />}
+                </Pressable>
+              </View>
+            )}
+
           </View>
         </View>
 
@@ -156,7 +239,6 @@ export default function ProfileScreen() {
         </View>
         <View className='h-20'></View>
       </ScrollView>
-
     </SafeAreaView>
   );
 }

@@ -6,27 +6,32 @@ import * as MediaLibrary from 'expo-media-library';
 export function useStartupPermissions() {
   useEffect(() => {
     async function requestPermissions() {
-      // 1. Request Notification Permissions
-      const { status: existingNotifStatus } = await Notifications.getPermissionsAsync();
-      
-      // If 'undetermined', it means the user has never been asked before
-      if (existingNotifStatus !== 'granted') {
-        await Notifications.requestPermissionsAsync({
-          ios: {
-            allowAlert: true,
-            allowBadge: true,
-            allowSound: true,
-          },
-        });
-      }
-
-      // 2. Request Media Library Permissions (For Avatars / Saving Images)
-      if (Platform.OS !== 'web') {
-        const { status: existingMediaStatus } = await MediaLibrary.getPermissionsAsync();
+      try {
+        // 1. Request Notification Permissions
+        const notifResponse = await Notifications.getPermissionsAsync();
         
-        if (existingMediaStatus !== 'granted') {
-          await MediaLibrary.requestPermissionsAsync();
+        // ONLY ask if we are allowed to ask (undetermined or canAskAgain)
+        if (notifResponse.status !== 'granted' && notifResponse.canAskAgain) {
+          await Notifications.requestPermissionsAsync({
+            ios: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+            },
+          });
         }
+
+        // 2. Request Media Library Permissions
+        if (Platform.OS !== 'web') {
+          const mediaResponse = await MediaLibrary.getPermissionsAsync();
+          
+          if (mediaResponse.status !== 'granted' && mediaResponse.canAskAgain) {
+            await MediaLibrary.requestPermissionsAsync();
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to request permissions on startup:", error);
+        // The app will continue loading safely even if permissions fail!
       }
     }
 
@@ -40,5 +45,7 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true, // <-- ADDED: Fixes the TypeScript Error
+    shouldShowList: true,   // <-- ADDED: Fixes the TypeScript Error
   }),
 });

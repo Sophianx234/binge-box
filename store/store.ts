@@ -98,6 +98,7 @@ export interface User {
   username?: string;
   avatar?: string;
   bio?: string;
+  birthdate?: string;
 }
 
 interface AuthState {
@@ -106,6 +107,7 @@ interface AuthState {
   setAuth: (token: string, user: User) => Promise<void>; 
   logout: () => Promise<void>;
   checkTokenAtStartup: () => Promise<void>;
+  updateUser: (updatedUser: User) => Promise<void>; // <-- ADDED
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -134,5 +136,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         user: JSON.parse(savedUser) 
       });
     }
+  },
+
+  // --- NEW: Updates the user object in local storage and active state ---
+  updateUser: async (updatedUser: User) => {
+    await AsyncStorage.setItem('userData', JSON.stringify(updatedUser));
+    set({ user: updatedUser });
   },
 }));

@@ -43,19 +43,20 @@ export default function MovieDetailScreen() {
 
   const token = useAuthStore((state) => state.token) as string;
 
+  // --- ENVIRONMENT TOGGLE ---
+  const isVidsrcMode = (process.env.EXPO_PUBLIC_PLAYER_URL as string).includes('vidsrc');
+
   const [playing, setPlaying] = useState(false);
   const [userRating, setUserRating] = useState<number | null>(null);
   
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
 
-  // --- ZUSTAND: DOWNLOADS ONLY (Deleted Ghost Variables!) ---
   const downloadedMovies = useMovieStore((state) => state.downloadedMovies);
   const addDownload = useMovieStore((state) => state.addDownload);
   const toggleDownloadStatusStore = useMovieStore((state) => state.toggleDownloadStatusStore);
   const updateDownloadProgress = useMovieStore((state) => state.updateDownloadProgress);
 
-  // --- REACT QUERY: SERVER STATE FETCHES ---
   const { data: movie, isLoading, isError } = useQuery({
     queryKey: ['movie', id],
     queryFn: () => fetchMovieDetails(id as string),
@@ -140,7 +141,7 @@ export default function MovieDetailScreen() {
 
   const handleRateMovie = (star: number) => {
     if (!movie) return;
-    setUserRating(star); // Instantly update UI locally
+    setUserRating(star); 
     setShowRateModal(false); 
     rateMutation.mutate({
       movieData: {
@@ -178,6 +179,21 @@ export default function MovieDetailScreen() {
     if (state === 'ended') setPlaying(false);
   }, []);
 
+  // --- NEW: DYNAMIC PLAY BUTTON HANDLER ---
+  const handlePlayAction = () => {
+    if (isVidsrcMode) {
+      if (!movie.imdb_id) {
+        Alert.alert("Not Available", "This movie is not currently available to stream.");
+        return;
+      }
+      // Route to our new player screen with the IMDB ID
+      router.push(`/player?imdbId=${movie.imdb_id}`);
+    } else {
+      // Legit mode: Just play the YouTube trailer inline
+      setPlaying(!playing);
+    }
+  };
+
   // --- RENDER CHECKS ---
   if (isLoading) {
     return (
@@ -198,16 +214,17 @@ export default function MovieDetailScreen() {
     );
   }
 
-  // --- DYNAMIC STATE CALCULATORS (Crash-Proofed) ---
-  // Safely checks if it is an array before calling .some()
   const isSaved = Array.isArray(libraryData) && libraryData.some((m: any) => m.tmdbId === movie.id && m.inWatchlist);
   const isFavorite = Array.isArray(favoriteData) && favoriteData.some((m: any) => m.tmdbId === movie.id);
-  
-  // Calculate Rating: Use local state if recently clicked, otherwise pull from Database!
   const dbRating = Array.isArray(libraryData) ? libraryData.find((m: any) => m.tmdbId === movie.id)?.rating : null;
   const displayRating = userRating || dbRating;
-
   const trailer = movie?.videos?.results?.find((vid: any) => vid.type === 'Trailer' && vid.site === 'YouTube');
+
+  // Logic to determine if the main button should be disabled and what it should say
+  const canPlay = isVidsrcMode ? !!movie.imdb_id : !!trailer;
+  const playButtonText = isVidsrcMode 
+    ? "Play Movie" 
+    : (!trailer ? 'No Trailer' : playing ? 'Close Trailer' : 'Play Trailer');
 
   return (
     <View className="flex-1 bg-background">
@@ -215,7 +232,7 @@ export default function MovieDetailScreen() {
         
         {/* HERO SECTION */}
         <View className="w-full bg-black">
-          {playing && trailer ? (
+          {playing && trailer && !isVidsrcMode ? (
             <View className="mt-12 w-full justify-center items-center bg-black">
               <YoutubePlayer
                 height={width * (9 / 16)}
@@ -228,7 +245,6 @@ export default function MovieDetailScreen() {
             </View>
           ) : (
             <View className="relative w-full aspect-[4/5]">
-              {/* FIXED: Prevented undefined URI crash by using a fallback URL */}
               <Image 
                 source={{ uri: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Poster' }}
                 className="w-full h-full bg-surface"
@@ -239,7 +255,6 @@ export default function MovieDetailScreen() {
               </Pressable>
               
               <Pressable onPress={handleSave} className="absolute top-12 right-5 bg-black/50 p-2 rounded-full">
-                {/* ADDED: Spinner while saving */}
                 {saveMutation.isPending ? (
                   <ActivityIndicator size="small" color="#00E5FF" />
                 ) : (
@@ -284,20 +299,19 @@ export default function MovieDetailScreen() {
           {/* PRIMARY ACTION BUTTONS */}
           <View className="flex-row gap-4 mb-6">
             <Pressable 
-              onPress={() => setPlaying(!playing)}
-              disabled={!trailer}
+              onPress={handlePlayAction}
+              disabled={!canPlay}
               className={`flex-1 flex-row items-center justify-center py-3.5 rounded-xl ${
-                !trailer ? 'bg-surface opacity-50' : playing ? 'bg-red-600' : 'bg-[#00E5FF]'
+                !canPlay ? 'bg-surface opacity-50' : playing && !isVidsrcMode ? 'bg-red-600' : 'bg-[#00E5FF]'
               }`}
             >
-              <Ionicons name={playing ? "close" : "play"} size={20} color={playing ? "#FFFFFF" : "#000000"} />
-              <Text className={`font-bold text-base ml-2 ${playing ? "text-white" : "text-black"}`}>
-                {!trailer ? 'No Trailer' : playing ? 'Close Trailer' : 'Play Trailer'}
+              <Ionicons name={playing && !isVidsrcMode ? "close" : "play"} size={20} color={playing && !isVidsrcMode ? "#FFFFFF" : "#000000"} />
+              <Text className={`font-bold text-base ml-2 ${playing && !isVidsrcMode ? "text-white" : "text-black"}`}>
+                {playButtonText}
               </Text>
             </Pressable>
             
             <Pressable onPress={handleSave} className="bg-surface flex-row items-center justify-center py-3.5 px-6 rounded-xl border border-[#1A2235]">
-              {/* ADDED: Loading spinner to the big button too */}
               {saveMutation.isPending ? (
                  <ActivityIndicator size="small" color="#00E5FF" />
               ) : (
@@ -340,7 +354,6 @@ export default function MovieDetailScreen() {
 
             <Pressable onPress={handleFavoriteToggle} className="items-center w-20">
               <View className="h-10 justify-center">
-                {/* ADDED: Loading spinner for the heart icon */}
                 {favoriteMutation.isPending ? (
                   <ActivityIndicator size="small" color="#EF4444" />
                 ) : (

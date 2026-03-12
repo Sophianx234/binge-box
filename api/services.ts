@@ -17,6 +17,42 @@ const url = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
 // TMDB EXTERNAL API FETCHES
 // ==========================================
 
+
+// Upload Avatar to Backend
+export const uploadAvatarToServer = async (token: string, imageUri: string) => {
+  // 1. Create a FormData object
+  const formData = new FormData();
+  
+  // 2. Extract the file extension and name from the URI
+  const filename = imageUri.split('/').pop() || 'avatar.jpg';
+  const match = /\.(\w+)$/.exec(filename);
+  const type = match ? `image/${match[1]}` : `image/jpeg`;
+
+  // 3. Append the image (React Native requires this specific object structure)
+  formData.append('avatar', {
+    uri: imageUri,
+    name: filename,
+    type,
+  } as any);
+
+  // 4. Send it to Express!
+  const res = await fetch(`${url}/users/avatar`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/json',
+      // Note: We deliberately DO NOT set 'Content-Type' here. 
+      // Fetch will automatically set it to 'multipart/form-data' with the correct boundary!
+    },
+    body: formData,
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Failed to upload avatar');
+  
+  return data.user; // The backend returns the updated user object
+};
+
 export const fetchMovies = async (query?: string) => {
   try {
     const endpoint = query 

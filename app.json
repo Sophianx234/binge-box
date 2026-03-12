@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "binge",
-    "slug": "binge",
+    "name": "Binge Box",
+    "slug": "binge-box",
     "version": "1.0.0",
     "scheme": "native-movies",
     "platforms": [
