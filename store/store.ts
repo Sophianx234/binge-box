@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store'; // <-- Added SecureStore
+import * as SecureStore from 'expo-secure-store';
 
 // ==========================================
 // 1. BEAR STORE (Testing/Boilerplate)
@@ -21,33 +21,65 @@ export const useStore = create<BearState>((set) => ({
 }));
 
 // ==========================================
-// 2. MOVIE STORE (Persisted with AsyncStorage)
+// 2. MOVIE STORE (Downloads ONLY - Client State)
 // ==========================================
-export interface SavedMovie {
+export interface DownloadItem {
   id: number;
   title: string;
   poster_path: string | null;
-  release_date: string;
+  size: string;
+  duration: string;
+  progress: number;
+  status: 'completed' | 'downloading' | 'paused';
 }
 
 interface MovieState {
-  savedMovies: SavedMovie[];
-  toggleSaveMovie: (movie: SavedMovie) => void;
+  downloadedMovies: DownloadItem[]; 
+  updateDownloadProgress: (id: number, progress: number) => void;
+  addDownload: (movie: DownloadItem) => void;
+  removeDownload: (id: number) => void;
+  toggleDownloadStatusStore: (id: number) => void;
 }
 
 export const useMovieStore = create<MovieState>()(
   persist(
     (set) => ({
-      savedMovies: [],
-      toggleSaveMovie: (movie) =>
+      downloadedMovies: [],
+
+      updateDownloadProgress: (id, progress) =>
+        set((state) => ({
+          downloadedMovies: state.downloadedMovies.map((movie) => {
+            if (movie.id === id) {
+              const newStatus = progress >= 100 ? 'completed' : movie.status;
+              return { ...movie, progress: Math.min(progress, 100), status: newStatus };
+            }
+            return movie;
+          }),
+        })),
+
+      addDownload: (movie) =>
         set((state) => {
-          const isSaved = state.savedMovies.some((m) => m.id === movie.id);
-          if (isSaved) {
-            return { savedMovies: state.savedMovies.filter((m) => m.id !== movie.id) };
-          } else {
-            return { savedMovies: [movie, ...state.savedMovies] };
-          }
+          if (state.downloadedMovies.some((m) => m.id === movie.id)) return state;
+          return { downloadedMovies: [movie, ...state.downloadedMovies] };
         }),
+
+      removeDownload: (id) =>
+        set((state) => ({
+          downloadedMovies: state.downloadedMovies.filter((m) => m.id !== id),
+        })),
+
+      toggleDownloadStatusStore: (id) =>
+        set((state) => ({
+          downloadedMovies: state.downloadedMovies.map((movie) => {
+            if (movie.id === id) {
+              return {
+                ...movie,
+                status: movie.status === 'downloading' ? 'paused' : 'downloading',
+              };
+            }
+            return movie;
+          }),
+        })),
     }),
     {
       name: 'bingebox-movie-storage',
@@ -57,35 +89,50 @@ export const useMovieStore = create<MovieState>()(
 );
 
 // ==========================================
-// 3. AUTH STORE (Secured with expo-secure-store)
+// 3. AUTH STORE (Secured + AsyncStorage)
 // ==========================================
+export interface User {
+  id: string | number;
+  name: string;
+  email: string;
+  username?: string;
+  avatar?: string;
+  bio?: string;
+}
+
 interface AuthState {
   token: string | null;
-  setToken: (token: string) => Promise<void>;
+  user: User | null;
+  setAuth: (token: string, user: User) => Promise<void>; 
   logout: () => Promise<void>;
-  checkTokenAtStartup: () => Promise<void>; // Added this to load the token when the app opens!
+  checkTokenAtStartup: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
+  user: null, 
 
-  // Save token to state AND secure hardware
-  setToken: async (newToken: string) => {
+  setAuth: async (newToken: string, userData: User) => {
     await SecureStore.setItemAsync('userToken', newToken);
-    set({ token: newToken });
+    await AsyncStorage.setItem('userData', JSON.stringify(userData)); 
+    set({ token: newToken, user: userData });
   },
 
-  // Remove token from state AND secure hardware
   logout: async () => {
     await SecureStore.deleteItemAsync('userToken');
-    set({ token: null });
+    await AsyncStorage.removeItem('userData'); 
+    set({ token: null, user: null });
   },
 
-  // Call this ONCE when your _layout.tsx mounts to check if they are already logged in
   checkTokenAtStartup: async () => {
     const savedToken = await SecureStore.getItemAsync('userToken');
-    if (savedToken) {
-      set({ token: savedToken });
+    const savedUser = await AsyncStorage.getItem('userData'); 
+    
+    if (savedToken && savedUser) {
+      set({ 
+        token: savedToken, 
+        user: JSON.parse(savedUser) 
+      });
     }
   },
 }));

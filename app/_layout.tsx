@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SplashScreen, Stack, useRouter, useSegments } from 'expo-router';
 import { useFonts } from 'expo-font';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useAuthStore } from '@/store/store'; // <-- Added Auth Store
+import { useAuthStore } from '@/store/store'; 
 
 // Import all 14 fonts
 import { ArchivoBlack_400Regular } from '@expo-google-fonts/archivo-black';
@@ -22,6 +22,7 @@ import { Pacifico_400Regular } from '@expo-google-fonts/pacifico';
 import { Parisienne_400Regular } from '@expo-google-fonts/parisienne';
 import { RubikMonoOne_400Regular } from '@expo-google-fonts/rubik-mono-one';
 import { Sacramento_400Regular } from '@expo-google-fonts/sacramento';
+import { useStartupPermissions } from '@/permissions/startup';
 
 // 1. Keep the splash screen visible while fonts load AND auth checks
 SplashScreen.preventAutoHideAsync();
@@ -35,6 +36,10 @@ export default function RootLayout() {
   
   const segments = useSegments();
   const router = useRouter();
+
+  // 2. CALL THE HOOK HERE
+  // It will run exactly once when the app boots up and handle all the native popups
+  useStartupPermissions();
 
   // 3. Load the fonts
   const [fontsLoaded, error] = useFonts({
@@ -63,7 +68,7 @@ export default function RootLayout() {
     initAuth();
   }, []);
 
-  // 5. The "Bouncer" Logic (Route Protection)// 5. The "Bouncer" Logic (Route Protection)
+  // 5. The "Bouncer" Logic (Route Protection)
   useEffect(() => {
     // Don't route anyone until BOTH fonts and auth are ready
     if (!isAuthReady || (!fontsLoaded && !error)) return;

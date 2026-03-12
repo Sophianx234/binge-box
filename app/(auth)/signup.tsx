@@ -1,31 +1,35 @@
-import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import React from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker'; // <-- Imported Date Picker
 import { useAuthStore } from '@/store/store';
 import { registerUser } from '@/api/services';
+import Logo from '@/components/Logo';
 
-// 1. Define the Zod Schema (Matches your backend requirements)
+// 1. Zod Schema
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Please enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  birthdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Please use YYYY-MM-DD format"),
+  birthdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Please select your birthdate"), // Kept the regex for backend safety!
 });
 
-// Infer the TypeScript type directly from the Zod schema
 type SignupFormData = z.infer<typeof signupSchema>;
 
 export default function SignUpScreen() {
   const router = useRouter();
-  const setToken = useAuthStore((state) => state.setToken);
+  const setAuth = useAuthStore((state) => state.setAuth);
 
-  // 2. Initialize React Hook Form
+  // --- NEW: Date Picker State ---
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date(2000, 0, 1)); // Default starts at Jan 1, 2000
+
   const { control, handleSubmit, formState: { errors } } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -37,24 +41,25 @@ export default function SignUpScreen() {
     }
   });
 
-  // 3. Setup the React Query Mutation
   const registerMutation = useMutation({
     mutationFn: registerUser,
     onSuccess: async (data) => {
-      // Save the token securely to the device
-      await setToken(data.token);
+      await setAuth(data.token, data.user);
       Alert.alert("Success", "Account created successfully!");
-      // Navigate to the main app layout
-      router.replace('/'); 
+      router.replace('/(tabs)'); 
     },
     onError: (error: any) => {
       Alert.alert("Registration Failed", error.message);
     }
   });
 
-  // 4. Submit Handler
   const onSubmit = (data: SignupFormData) => {
     registerMutation.mutate(data);
+  };
+
+  // Helper to format Date object to YYYY-MM-DD for your backend
+  const formatLocal = (d: Date) => {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
 
   return (
@@ -62,19 +67,25 @@ export default function SignUpScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
       className="flex-1 bg-black"
     >
+      {registerMutation.isPending && (
+        <View className="absolute z-50 w-full h-full bg-black/80 justify-center items-center">
+          <ActivityIndicator size="large" color="#00E5FF" />
+          <Text className="text-[#00E5FF] mt-4 font-bold tracking-widest text-sm">
+            CREATING ACCOUNT...
+          </Text>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24 }}>
         
-        {/* Header */}
         <View className="mb-10 items-center">
-          <Ionicons name="film-outline" size={60} color="#FFFFFF" />
+          <Logo/>
           <Text className="text-white text-3xl font-bold mt-4 tracking-wider">Join Binge Box</Text>
           <Text className="text-white/60 text-base mt-2">Create an account to save your favorites.</Text>
         </View>
 
-        {/* Form Fields */}
         <View className="gap-5">
           
-          {/* Name Input */}
           <Controller
             control={control}
             name="name"
@@ -82,7 +93,7 @@ export default function SignUpScreen() {
               <View>
                 <TextInput
                   placeholder="Full Name"
-                  placeholderTextColor="#FFFFFF80" // White at 50% opacity
+                  placeholderTextColor="#FFFFFF80"
                   onBlur={onBlur}
                   onChangeText={onChange}
                   value={value}
@@ -93,7 +104,6 @@ export default function SignUpScreen() {
             )}
           />
 
-          {/* Username Input */}
           <Controller
             control={control}
             name="username"
@@ -113,7 +123,6 @@ export default function SignUpScreen() {
             )}
           />
 
-          {/* Email Input */}
           <Controller
             control={control}
             name="email"
@@ -134,7 +143,6 @@ export default function SignUpScreen() {
             )}
           />
 
-          {/* Password Input */}
           <Controller
             control={control}
             name="password"
@@ -154,22 +162,56 @@ export default function SignUpScreen() {
             )}
           />
 
-          {/* Birthdate Input */}
+          {/* --- NEW: INTERACTIVE BIRTHDATE PICKER --- */}
           <Controller
             control={control}
             name="birthdate"
-            render={({ field: { onChange, onBlur, value } }) => (
+            render={({ field: { onChange, value } }) => (
               <View>
-                <TextInput
-                  placeholder="Birthdate (YYYY-MM-DD)"
-                  placeholderTextColor="#FFFFFF80"
-                  keyboardType="numbers-and-punctuation"
-                  onBlur={onBlur}
-                  onChangeText={onChange}
-                  value={value}
-                  className={`bg-black text-white px-5 py-4 border rounded-xl text-base ${errors.birthdate ? 'border-red-500' : 'border-white/20'}`}
-                />
+                <Pressable 
+                  onPress={() => setShowDatePicker(true)}
+                  className={`bg-black flex-row justify-between items-center px-5 py-4 border rounded-xl ${errors.birthdate ? 'border-red-500' : 'border-white/20'}`}
+                >
+                  <Text className={`text-base ${value ? 'text-white' : 'text-[#FFFFFF80]'}`}>
+                    {value ? value : "Birthdate (YYYY-MM-DD)"}
+                  </Text>
+                  <Ionicons name="calendar-outline" size={20} color={value ? "#00E5FF" : "#FFFFFF80"} />
+                </Pressable>
                 {errors.birthdate && <Text className="text-red-500 text-xs mt-1.5 ml-1">{errors.birthdate.message}</Text>}
+
+                {/* The Native Date Picker Component */}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={value ? new Date(value) : tempDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'} // Spinner looks best on iOS dark mode
+                    maximumDate={new Date()} // Can't be born in the future!
+                    onChange={(event, selectedDate) => {
+                      if (Platform.OS === 'android') {
+                        setShowDatePicker(false); // Android closes automatically
+                      }
+                      if (selectedDate) {
+                        setTempDate(selectedDate);
+                        if (event.type === 'set') {
+                          onChange(formatLocal(selectedDate)); // Updates React Hook Form safely
+                        }
+                      }
+                    }}
+                  />
+                )}
+                
+                {/* iOS Done Button (Because iOS spinners don't close automatically) */}
+                {Platform.OS === 'ios' && showDatePicker && (
+                  <Pressable 
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      onChange(formatLocal(tempDate)); // Save whatever is currently spun
+                    }} 
+                    className="bg-[#1A2235] py-3 rounded-lg mt-2 items-center"
+                  >
+                    <Text className="text-[#00E5FF] font-bold">Done</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           />
@@ -181,17 +223,13 @@ export default function SignUpScreen() {
           disabled={registerMutation.isPending}
           className="bg-[#00E5FF] mt-8 py-4 rounded-xl items-center flex-row justify-center"
         >
-          {registerMutation.isPending ? (
-            <ActivityIndicator color="#000000" />
-          ) : (
-            <Text className="text-black font-bold text-lg">Create Account</Text>
-          )}
+          <Text className="text-black font-bold text-lg">Create Account</Text>
         </Pressable>
 
         {/* Navigate to Login */}
-        <View className="flex-row justify-center mt-6">
+        <View className="flex-row justify-center mt-6 mb-10">
           <Text className="text-white/60 text-base">Already have an account? </Text>
-          <Pressable onPress={() => router.push('/login')}>
+          <Pressable onPress={() => router.push('/(auth)/signin')}>
             <Text className="text-[#00E5FF] font-bold text-base">Log In</Text>
           </Pressable>
         </View>

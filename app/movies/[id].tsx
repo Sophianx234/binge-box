@@ -1,11 +1,39 @@
 import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, useWindowDimensions, Modal, Alert } from 'react-native';
 import React, { useState, useCallback } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; // <-- Imported React Query tools
-import { fetchMovieDetails, saveMovie, toggleFavorite, rateMovie, markAsDownloaded } from '@/api/services'; // <-- Imported API functions
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; 
+import { fetchMovieDetails, saveMovie, toggleFavorite, rateMovie, markAsDownloaded, getMyLibrary, getFavoriteMovies } from '@/api/services'; 
 import { Ionicons } from '@expo/vector-icons';
-import { useMovieStore, useAuthStore } from '@/store/store'; // <-- Imported both stores
+import { useMovieStore, useAuthStore } from '@/store/store'; 
 import YoutubePlayer from 'react-native-youtube-iframe';
+import Svg, { Circle } from 'react-native-svg';
+
+// --- CUSTOM SVG PROGRESS RING COMPONENT ---
+const DownloadProgressRing = ({ progress, status }: { progress: number, status: string }) => {
+  const radius = 14;
+  const strokeWidth = 2.5;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (progress / 100) * circumference;
+  const color = status === 'paused' ? '#8899B6' : '#00E5FF';
+
+  return (
+    <View className="relative items-center justify-center w-10 h-10">
+      <Svg height="40" width="40" viewBox="0 0 40 40" style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle cx="20" cy="20" r={radius} stroke="#1A2235" strokeWidth={strokeWidth} fill="transparent" />
+        <Circle 
+          cx="20" cy="20" r={radius} 
+          stroke={color} strokeWidth={strokeWidth} fill="transparent" 
+          strokeDasharray={circumference} 
+          strokeDashoffset={strokeDashoffset} 
+          strokeLinecap="round" 
+        />
+      </Svg>
+      <View className="absolute">
+        <Ionicons name={status === 'downloading' ? 'pause' : 'play'} size={14} color="#F8F9FA" />
+      </View>
+    </View>
+  );
+};
 
 export default function MovieDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -13,63 +41,71 @@ export default function MovieDetailScreen() {
   const { width } = useWindowDimensions(); 
   const queryClient = useQueryClient();
 
-  // 1. Grab the secure token from Zustand
-  const token = useAuthStore((state) => state.token);
+  const token = useAuthStore((state) => state.token) as string;
 
   const [playing, setPlaying] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [userRating, setUserRating] = useState<number | null>(null);
   
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
 
-  const savedMovies = useMovieStore((state) => state.savedMovies);
-  const toggleSaveMovie = useMovieStore((state) => state.toggleSaveMovie);
+  // --- ZUSTAND: DOWNLOADS ONLY (Deleted Ghost Variables!) ---
+  const downloadedMovies = useMovieStore((state) => state.downloadedMovies);
+  const addDownload = useMovieStore((state) => state.addDownload);
+  const toggleDownloadStatusStore = useMovieStore((state) => state.toggleDownloadStatusStore);
+  const updateDownloadProgress = useMovieStore((state) => state.updateDownloadProgress);
 
-  // --- FETCH MOVIE DATA ---
+  // --- REACT QUERY: SERVER STATE FETCHES ---
   const { data: movie, isLoading, isError } = useQuery({
     queryKey: ['movie', id],
     queryFn: () => fetchMovieDetails(id as string),
   });
 
-  // --- REACT QUERY MUTATIONS ---
+  const { data: libraryData = [] } = useQuery({
+    queryKey: ['myLibrary'],
+    queryFn: () => getMyLibrary(token),
+    enabled: !!token,
+  });
 
-  // A. Save Movie
+  const { data: favoriteData = [] } = useQuery({
+    queryKey: ['favoriteMovies'],
+    queryFn: () => getFavoriteMovies(token),
+    enabled: !!token,
+  });
+
+  const currentDownload = downloadedMovies.find(m => m.id === movie?.id);
+
+  // --- REACT QUERY MUTATIONS ---
   const saveMutation = useMutation({
     mutationFn: (movieData: any) => {
       if (!token) throw new Error("Please log in to save movies.");
       return saveMovie(token, movieData);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myLibrary'] });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['myLibrary'] }),
     onError: (error: any) => Alert.alert("Error", error.message || "Failed to save movie.")
   });
 
-  // B. Toggle Favorite
   const favoriteMutation = useMutation({
-    mutationFn: (tmdbId: number) => {
+    mutationFn: (moviePayload: { tmdbId: number, title: string, posterPath: string | null }) => { 
       if (!token) throw new Error("Please log in to favorite movies.");
-      return toggleFavorite(token, tmdbId);
+      return toggleFavorite(token, moviePayload); 
     },
-    onSuccess: (data) => setIsFavorite(data.isFavorite),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['favoriteMovies'] });
+      queryClient.invalidateQueries({ queryKey: ['myLibrary'] });
+    },
     onError: (error: any) => Alert.alert("Oops", error.message || "Something went wrong.")
   });
 
-  // C. Rate Movie
   const rateMutation = useMutation({
-    mutationFn: (rating: number) => {
+    mutationFn: (payload: { movieData: any, rating: number }) => { 
       if (!token) throw new Error("Please log in to rate movies.");
-      return rateMovie(token, movie.id, rating);
+      return rateMovie(token, payload.movieData, payload.rating); 
     },
-    onSuccess: (_, rating) => {
-      setUserRating(rating);
-      setShowRateModal(false);
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['myLibrary'] }),
     onError: (error: any) => Alert.alert("Error", error.message || "Failed to save rating.")
   });
 
-  // D. Download Movie
   const downloadMutation = useMutation({
     mutationFn: (quality: string) => {
       if (!token) throw new Error("Please log in to download.");
@@ -79,26 +115,13 @@ export default function MovieDetailScreen() {
         posterPath: movie.poster_path,
       });
     },
-    onSuccess: (_, quality) => {
-      Alert.alert("Download Started", `${movie.title} is downloading in ${quality}. Check your Downloads tab.`);
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['myLibrary'] }),
     onError: (error: any) => Alert.alert("Error", error.message || "Failed to sync download.")
   });
 
   // --- HANDLERS ---
-
   const handleSave = () => {
-    if (!movie || saveMutation.isPending) return;
-
-    // 1. Optimistic UI update (feels instant to the user)
-    toggleSaveMovie({
-      id: movie.id,
-      title: movie.title,
-      poster_path: movie.poster_path,
-      release_date: movie.release_date,
-    });
-
-    // 2. Background database sync
+    if (!movie) return;
     saveMutation.mutate({
       tmdbId: movie.id,
       title: movie.title,
@@ -106,9 +129,49 @@ export default function MovieDetailScreen() {
     });
   };
 
+  const handleFavoriteToggle = () => {
+    if (!movie) return;
+    favoriteMutation.mutate({
+      tmdbId: movie.id,
+      title: movie.title,
+      posterPath: movie.poster_path
+    }); 
+  };
+
+  const handleRateMovie = (star: number) => {
+    if (!movie) return;
+    setUserRating(star); // Instantly update UI locally
+    setShowRateModal(false); 
+    rateMutation.mutate({
+      movieData: {
+        tmdbId: movie.id,
+        title: movie.title,
+        posterPath: movie.poster_path
+      },
+      rating: star
+    });
+  };
+
   const handleDownloadSelection = (quality: string) => {
     setShowDownloadModal(false);
+    addDownload({
+      id: movie.id,
+      title: movie.title,
+      poster_path: movie.poster_path,
+      size: quality.includes('1080p') ? '2.4 GB' : quality.includes('720p') ? '1.2 GB' : '500 MB',
+      duration: movie.runtime ? `${movie.runtime}m` : '2h 0m',
+      progress: 0,
+      status: 'downloading'
+    });
+
     downloadMutation.mutate(quality);
+
+    let mockProgress = 0;
+    const interval = setInterval(() => {
+      mockProgress += 5;
+      updateDownloadProgress(movie.id, mockProgress);
+      if (mockProgress >= 100) clearInterval(interval);
+    }, 500); 
   };
 
   const onStateChange = useCallback((state: string) => {
@@ -135,7 +198,15 @@ export default function MovieDetailScreen() {
     );
   }
 
-  const isSaved = savedMovies.some((savedMovie: any) => savedMovie.id === movie.id);
+  // --- DYNAMIC STATE CALCULATORS (Crash-Proofed) ---
+  // Safely checks if it is an array before calling .some()
+  const isSaved = Array.isArray(libraryData) && libraryData.some((m: any) => m.tmdbId === movie.id && m.inWatchlist);
+  const isFavorite = Array.isArray(favoriteData) && favoriteData.some((m: any) => m.tmdbId === movie.id);
+  
+  // Calculate Rating: Use local state if recently clicked, otherwise pull from Database!
+  const dbRating = Array.isArray(libraryData) ? libraryData.find((m: any) => m.tmdbId === movie.id)?.rating : null;
+  const displayRating = userRating || dbRating;
+
   const trailer = movie?.videos?.results?.find((vid: any) => vid.type === 'Trailer' && vid.site === 'YouTube');
 
   return (
@@ -157,8 +228,9 @@ export default function MovieDetailScreen() {
             </View>
           ) : (
             <View className="relative w-full aspect-[4/5]">
+              {/* FIXED: Prevented undefined URI crash by using a fallback URL */}
               <Image 
-                source={{ uri: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : undefined }}
+                source={{ uri: movie.poster_path ? `https://image.tmdb.org/t/p/w500${movie.poster_path}` : 'https://via.placeholder.com/500x750?text=No+Poster' }}
                 className="w-full h-full bg-surface"
                 resizeMode="cover"
               />
@@ -166,12 +238,8 @@ export default function MovieDetailScreen() {
                 <Ionicons name="chevron-back" size={28} color="#F8F9FA" />
               </Pressable>
               
-              {/* SAVE BUTTON */}
-              <Pressable 
-                onPress={handleSave} 
-                disabled={saveMutation.isPending}
-                className="absolute top-12 right-5 bg-black/50 p-2 rounded-full"
-              >
+              <Pressable onPress={handleSave} className="absolute top-12 right-5 bg-black/50 p-2 rounded-full">
+                {/* ADDED: Spinner while saving */}
                 {saveMutation.isPending ? (
                   <ActivityIndicator size="small" color="#00E5FF" />
                 ) : (
@@ -228,9 +296,10 @@ export default function MovieDetailScreen() {
               </Text>
             </Pressable>
             
-            <Pressable onPress={handleSave} disabled={saveMutation.isPending} className="bg-surface flex-row items-center justify-center py-3.5 px-6 rounded-xl border border-[#1A2235]">
+            <Pressable onPress={handleSave} className="bg-surface flex-row items-center justify-center py-3.5 px-6 rounded-xl border border-[#1A2235]">
+              {/* ADDED: Loading spinner to the big button too */}
               {saveMutation.isPending ? (
-                <ActivityIndicator size="small" color="#00E5FF" />
+                 <ActivityIndicator size="small" color="#00E5FF" />
               ) : (
                 <>
                   <Ionicons name={isSaved ? "checkmark" : "add"} size={22} color={isSaved ? "#00E5FF" : "#F8F9FA"} />
@@ -245,28 +314,48 @@ export default function MovieDetailScreen() {
           {/* SECONDARY ACTION ICONS */}
           <View className="flex-row justify-around py-4 mb-6 border-t border-b border-[#1A2235]">
             
-            <Pressable onPress={() => setShowDownloadModal(true)} disabled={downloadMutation.isPending} className="items-center">
-              {downloadMutation.isPending ? <ActivityIndicator size="small" color="#F8F9FA" /> : <Ionicons name="download-outline" size={26} color="#F8F9FA" />}
-              <Text className="text-[#8899B6] text-xs mt-1.5 font-medium">Download</Text>
-            </Pressable>
+            {/* DYNAMIC DOWNLOAD BUTTON */}
+            {!currentDownload ? (
+              <Pressable onPress={() => setShowDownloadModal(true)} className="items-center w-20">
+                <View className="h-10 justify-center">
+                  <Ionicons name="download-outline" size={26} color="#F8F9FA" />
+                </View>
+                <Text className="text-[#8899B6] text-xs mt-1.5 font-medium">Download</Text>
+              </Pressable>
+            ) : currentDownload.status === 'completed' ? (
+              <View className="items-center w-20">
+                 <View className="h-10 justify-center">
+                    <Ionicons name="checkmark-circle" size={26} color="#00E5FF" />
+                 </View>
+                 <Text className="text-[#00E5FF] text-xs mt-1.5 font-bold">Downloaded</Text>
+              </View>
+            ) : (
+              <Pressable onPress={() => toggleDownloadStatusStore(movie.id)} className="items-center w-20">
+                 <DownloadProgressRing progress={currentDownload.progress} status={currentDownload.status} />
+                 <Text className={`text-xs mt-1.5 font-bold ${currentDownload.status === 'paused' ? 'text-[#8899B6]' : 'text-[#00E5FF]'}`}>
+                   {currentDownload.status === 'paused' ? 'Resume' : 'Downloading'}
+                 </Text>
+              </Pressable>
+            )}
 
-            <Pressable onPress={() => favoriteMutation.mutate(movie.id)} disabled={favoriteMutation.isPending} className="items-center">
-              {favoriteMutation.isPending ? (
-                <ActivityIndicator size="small" color="#EF4444" />
-              ) : (
-                <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={26} color={isFavorite ? "#EF4444" : "#F8F9FA"} />
-              )}
+            <Pressable onPress={handleFavoriteToggle} className="items-center w-20">
+              <View className="h-10 justify-center">
+                {/* ADDED: Loading spinner for the heart icon */}
+                {favoriteMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={26} color={isFavorite ? "#EF4444" : "#F8F9FA"} />
+                )}
+              </View>
               <Text className="text-[#8899B6] text-xs mt-1.5 font-medium">Favorite</Text>
             </Pressable>
 
-            <Pressable onPress={() => setShowRateModal(true)} disabled={rateMutation.isPending} className="items-center">
-              {rateMutation.isPending ? (
-                <ActivityIndicator size="small" color="#00E5FF" />
-              ) : (
-                <Ionicons name={userRating ? "star" : "star-outline"} size={26} color={userRating ? "#00E5FF" : "#F8F9FA"} />
-              )}
+            <Pressable onPress={() => setShowRateModal(true)} className="items-center w-20">
+              <View className="h-10 justify-center">
+                <Ionicons name={displayRating ? "star" : "star-outline"} size={26} color={displayRating ? "#00E5FF" : "#F8F9FA"} />
+              </View>
               <Text className="text-[#8899B6] text-xs mt-1.5 font-medium">
-                {userRating ? `${userRating} Stars` : 'Rate'}
+                {displayRating ? `${displayRating} Stars` : 'Rate'}
               </Text>
             </Pressable>
           </View>
@@ -346,10 +435,10 @@ export default function MovieDetailScreen() {
               {[1, 2, 3, 4, 5].map((star) => (
                 <Pressable 
                   key={star} 
-                  onPress={() => rateMutation.mutate(star)}
+                  onPress={() => handleRateMovie(star)}
                   className="p-1"
                 >
-                  <Ionicons name={userRating && userRating >= star ? "star" : "star-outline"} size={40} color="#00E5FF" />
+                  <Ionicons name={displayRating && displayRating >= star ? "star" : "star-outline"} size={40} color="#00E5FF" />
                 </Pressable>
               ))}
             </View>

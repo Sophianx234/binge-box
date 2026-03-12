@@ -1,27 +1,57 @@
-import { View, Text, ScrollView, Pressable, Image, Switch } from 'react-native';
-import React, { ReactNode, useState } from 'react';
+import { View, Text, ScrollView, Pressable, Image, Switch, Alert } from 'react-native';
+import React, { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useMovieStore } from '@/store/store';
+import { useMovieStore, useAuthStore } from '@/store/store'; 
 import { useRouter } from 'expo-router';
+
 export type SettingsRowProps = {
-  icon:string,
-  title:string,
-  value:string,
-  showChevron?:boolean,
-  isDestructive?:boolean,
-  nav?:'/(tabs)/saved'   | '/(tabs)/downloads' | '/movies/favorites'
-}
+  icon: string;
+  title: string;
+  value?: string; 
+  showChevron?: boolean;
+  isDestructive?: boolean;
+  nav?: '/(tabs)/saved' | '/(tabs)/downloads' | '/movies/favorites';
+  onPress?: () => void; 
+};
+
 export default function ProfileScreen() {
-  // A simple state for a dummy "Dark Mode" or "Notifications" toggle
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const savedMovies = useMovieStore((state) => state.savedMovies);
+  
+  // 1. Grab BOTH the logout function AND the user object from Zustand!
+  const { logout, user } = useAuthStore((state) => ({
+    logout: state.logout,
+    user: state.user
+  }));
   const router = useRouter();
 
-  // A reusable component for the settings rows so we don't repeat code!
-  const SettingsRow = ({ icon, title, value, showChevron = true, isDestructive = false, nav }:SettingsRowProps ) => (
-    
-    <Pressable className="flex-row items-center py-4 border-b border-[#1A2235]" onPress={()=> nav && router.push(nav)}>
+  const handleLogout = () => {
+    Alert.alert(
+      "Sign Out",
+      "Are you sure you want to log out of your account?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Sign Out", 
+          style: "destructive", 
+          onPress: async () => {
+            await logout(); 
+            router.replace('/(auth)/signin'); 
+          }
+        }
+      ]
+    );
+  };
+
+  const SettingsRow = ({ icon, title, value, showChevron = true, isDestructive = false, nav, onPress }: SettingsRowProps ) => (
+    <Pressable 
+      className="flex-row items-center py-4 border-b border-[#1A2235]" 
+      onPress={() => {
+        if (onPress) onPress();
+        else if (nav) router.push(nav);
+      }}
+    >
       <View className={`w-8 h-8 rounded-full items-center justify-center mr-4 ${isDestructive ? 'bg-red-500/10' : 'bg-[#1A2235]'}`}>
         <Ionicons name={icon as any} size={18} color={isDestructive ? '#EF4444' : '#00E5FF'} />
       </View>
@@ -33,7 +63,6 @@ export default function ProfileScreen() {
     </Pressable>
   );
 
-
   return (
     <SafeAreaView className="bg-background flex-1">
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1 px-5">
@@ -42,24 +71,23 @@ export default function ProfileScreen() {
         <View className="items-center mt-6 mb-8">
           <View className="relative">
             <Image 
-              // Using a placeholder avatar
-              source={{ uri: 'https://i.pravatar.cc/150?img=11' }} 
+              // 2. You can even make the avatar dynamic later if your backend supports it!
+              source={{ uri: user?.avatar || 'https://i.pravatar.cc/150?img=11' }} 
               className="w-24 h-24 rounded-full border-2 border-[#00E5FF]"
             />
-            {/* Edit Avatar Button */}
             <Pressable className="absolute bottom-0 right-0 bg-[#00E5FF] w-8 h-8 rounded-full items-center justify-center border-2 border-background">
               <Ionicons name="pencil" size={14} color="#000000" />
             </Pressable>
           </View>
           
-          <Text className="text-primaryText text-2xl font-bold mt-4">
-            Sophian Abdul Rahman
+          {/* 3. Display the actual User's Name and Email */}
+          <Text className="text-primaryText text-2xl font-bold mt-4 capitalize">
+            {user?.name || 'Guest User'}
           </Text>
           <Text className="text-[#8899B6] text-sm mt-1">
-            sophian@bingebox.com
+            {user?.email || 'No email provided'}
           </Text>
           
-          {/* Premium Badge */}
           <View className="bg-[#00E5FF]/10 px-3 py-1 rounded-full mt-3">
             <Text className="text-[#00E5FF] text-xs font-bold tracking-widest">PRO MEMBER</Text>
           </View>
@@ -97,7 +125,6 @@ export default function ProfileScreen() {
             <SettingsRow icon="person" title="Account Details" />
             <SettingsRow icon="card" title="Subscription" value="Active" />
             
-            {/* Custom Row for the Toggle Switch */}
             <View className="flex-row items-center py-4 border-b border-[#1A2235]">
               <View className="w-8 h-8 rounded-full bg-[#1A2235] items-center justify-center mr-4">
                 <Ionicons name="notifications" size={18} color="#00E5FF" />
@@ -118,10 +145,16 @@ export default function ProfileScreen() {
         {/* --- LOGOUT --- */}
         <View className="mb-12">
           <View className="bg-surface px-4 rounded-2xl">
-            <SettingsRow icon="log-out" title="Sign Out" isDestructive={true} showChevron={false} />
+            <SettingsRow 
+              icon="log-out" 
+              title="Sign Out" 
+              isDestructive={true} 
+              showChevron={false} 
+              onPress={handleLogout} 
+            />
           </View>
         </View>
-<View className='h-20'></View>
+        <View className='h-20'></View>
       </ScrollView>
 
     </SafeAreaView>
