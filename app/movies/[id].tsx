@@ -1,4 +1,4 @@
-import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, useWindowDimensions, Modal, Alert } from 'react-native';
+import { View, Text, Image, ScrollView, ActivityIndicator, Pressable, useWindowDimensions, Modal, Alert, TextInput } from 'react-native';
 import React, { useState, useCallback, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'; 
@@ -40,16 +40,19 @@ export default function MovieDetailScreen() {
   const { width } = useWindowDimensions(); 
   const queryClient = useQueryClient();
 
-  // DEBUGGING: Check your terminal when clicking a TV show!
-  console.log("ROUTER PARAMS RECEIVED:", { id, type });
-
   const token = useAuthStore((state) => state.token) as string;
   const isVidsrcMode = process.env.EXPO_PUBLIC_APP_MODE?.includes('v') || false;
 
   const [playing, setPlaying] = useState(false);
+  
+  // --- REVIEW STATE ---
   const [userRating, setUserRating] = useState<number | null>(null);
+  const [reviewText, setReviewText] = useState('');
+  
+  // --- MODAL STATE ---
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
+  const [showReviewsModal, setShowReviewsModal] = useState(false); // NEW: To show the list of reviews
 
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
@@ -128,14 +131,28 @@ export default function MovieDetailScreen() {
     favoriteMutation.mutate({ tmdbId: movie.id, title: movie.title || movie.name, posterPath: movie.poster_path }); 
   };
 
-  const handleRateMovie = (star: number) => {
-    if (!movie) return;
-    setUserRating(star); 
-    setShowRateModal(false); 
+  // --- NEW: REVIEW SUBMISSION LOGIC ---
+  const handleStarClick = (star: number) => {
+    setUserRating(star);
+  };
+
+  const handleSubmitReview = () => {
+    if (!userRating) {
+      Alert.alert("Hold up!", "Please select a star rating first.");
+      return;
+    }
+    
+    // In a real app, your backend handles the reviewText. 
+    // We pass it to the mutation here.
     rateMutation.mutate({
       movieData: { tmdbId: movie.id, title: movie.title || movie.name, posterPath: movie.poster_path },
-      rating: star
+      rating: userRating,
+      review: reviewText 
     });
+
+    setShowRateModal(false);
+    setReviewText('');
+    Alert.alert("Success", "Your review has been posted!");
   };
 
   const handleDownloadSelection = (quality: string) => {
@@ -249,12 +266,10 @@ export default function MovieDetailScreen() {
             <Text className="text-[#8899B6] text-sm ml-1">{displayRuntime}</Text>
           </View>
 
-          {/* --- TV SHOW SEASON & EPISODE SELECTOR --- */}
           {type === 'tv' && validSeasons.length > 0 && (
             <View className="mb-6 bg-surface p-4 rounded-2xl border border-[#1A2235]">
               <Text className="text-primaryText font-bold text-base mb-3">Select Season</Text>
               
-              {/* Changed from ScrollView to a wrapping flex grid */}
               <View className="flex-row flex-wrap mb-2">
                 {validSeasons.map((season: any) => (
                   <Pressable 
@@ -274,7 +289,6 @@ export default function MovieDetailScreen() {
 
               <Text className="text-primaryText font-bold text-base mb-3 mt-2">Select Episode</Text>
               
-              {/* Changed to a wrapping grid so episode numbers stack neatly */}
               <View className="flex-row flex-wrap">
                 {Array.from({ length: episodeCount }).map((_, i) => {
                   const epNum = i + 1;
@@ -358,12 +372,23 @@ export default function MovieDetailScreen() {
               <Text className="text-[#8899B6] text-xs mt-1.5 font-medium">Favorite</Text>
             </Pressable>
 
+            {/* This opens the Write a Review modal */}
             <Pressable onPress={() => setShowRateModal(true)} className="items-center w-20">
               <View className="h-10 justify-center">
                 <Ionicons name={displayRating ? "star" : "star-outline"} size={26} color={displayRating ? "#00E5FF" : "#F8F9FA"} />
               </View>
               <Text className="text-[#8899B6] text-xs mt-1.5 font-medium">{displayRating ? `${displayRating} Stars` : 'Rate'}</Text>
             </Pressable>
+
+            {/* NEW: Button to READ Reviews */}
+            {movie.reviews && movie.reviews.results.length > 0 && (
+               <Pressable onPress={() => setShowReviewsModal(true)} className="items-center w-20">
+                 <View className="h-10 justify-center">
+                   <Ionicons name="chatbubbles-outline" size={26} color="#F8F9FA" />
+                 </View>
+                 <Text className="text-[#8899B6] text-xs mt-1.5 font-medium">Reviews</Text>
+               </Pressable>
+            )}
           </View>
 
           <Text className="text-primaryText text-xl font-bold mb-2">Synopsis</Text>
@@ -386,7 +411,7 @@ export default function MovieDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* --- MODALS --- */}
+      {/* --- MODAL 1: DOWNLOAD --- */}
       <Modal visible={showDownloadModal} transparent={true} animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/80 px-5">
           <View className="bg-surface w-full rounded-3xl p-6 border border-[#1A2235]">
@@ -412,25 +437,107 @@ export default function MovieDetailScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showRateModal} transparent={true} animationType="fade">
-        <View className="flex-1 justify-center items-center bg-black/80 px-5">
-          <View className="bg-surface w-full rounded-3xl p-8 border border-[#1A2235] items-center">
-            <Text className="text-white text-2xl font-bold mb-2">Rate this</Text>
-            <Text className="text-[#8899B6] text-center mb-8">What did you think of {displayTitle}?</Text>
-            <View className="flex-row gap-2 mb-8">
+      {/* --- MODAL 2: RATE & REVIEW --- */}
+      <Modal visible={showRateModal} transparent={true} animationType="slide">
+        <View className="flex-1 justify-end bg-black/80">
+          <View className="bg-surface w-full rounded-t-3xl p-8 border-t border-[#1A2235]">
+            
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-white text-2xl font-bold">Write a Review</Text>
+              <Pressable onPress={() => setShowRateModal(false)}>
+                <Ionicons name="close-circle" size={28} color="#8899B6" />
+              </Pressable>
+            </View>
+
+            <Text className="text-[#8899B6] mb-4">What did you think of {displayTitle}?</Text>
+            
+            <View className="flex-row justify-center gap-2 mb-6">
               {[1, 2, 3, 4, 5].map((star) => (
-                <Pressable 
-                  key={star} 
-                  onPress={() => handleRateMovie(star)}
-                  className="p-1"
-                >
-                  <Ionicons name={displayRating && displayRating >= star ? "star" : "star-outline"} size={40} color="#00E5FF" />
+                <Pressable key={star} onPress={() => handleStarClick(star)} className="p-1">
+                  <Ionicons name={userRating && userRating >= star ? "star" : "star-outline"} size={44} color="#00E5FF" />
                 </Pressable>
               ))}
             </View>
-            <Pressable onPress={() => setShowRateModal(false)} className="w-full bg-[#1A2235] py-4 rounded-xl items-center">
-              <Text className="text-white font-bold text-base">Close</Text>
+
+            <View className="bg-background rounded-xl border border-[#1A2235] p-4 mb-6">
+              <TextInput
+                className="text-primaryText text-base min-h-[100px]"
+                placeholder="Write your thoughts here..."
+                placeholderTextColor="#8899B6"
+                multiline={true}
+                textAlignVertical="top"
+                value={reviewText}
+                onChangeText={setReviewText}
+                selectionColor="#00E5FF"
+              />
+            </View>
+
+            <Pressable 
+              onPress={handleSubmitReview} 
+              disabled={rateMutation.isPending}
+              className={`w-full py-4 rounded-xl items-center flex-row justify-center ${rateMutation.isPending ? 'bg-surface' : 'bg-[#00E5FF]'}`}
+            >
+              {rateMutation.isPending ? <ActivityIndicator size="small" color="#00E5FF" /> : (
+                <>
+                  <Ionicons name="send" size={20} color="#000000" />
+                  <Text className="text-black font-bold text-lg ml-2">Post Review</Text>
+                </>
+              )}
             </Pressable>
+            
+          </View>
+        </View>
+      </Modal>
+
+      {/* --- MODAL 3: READ REVIEWS --- */}
+      <Modal visible={showReviewsModal} transparent={true} animationType="slide">
+        <View className="flex-1 justify-end bg-black/80">
+          <View className="bg-surface w-full h-[80%] rounded-t-3xl p-6 border-t border-[#1A2235]">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-white text-2xl font-bold">User Reviews</Text>
+              <Pressable onPress={() => setShowReviewsModal(false)}>
+                <Ionicons name="close-circle" size={28} color="#8899B6" />
+              </Pressable>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+  {movie?.reviews?.results?.map((review: any) => (
+    <View key={review.id} className="bg-background p-5 rounded-2xl mb-4 border border-[#1A2235]">
+      <View className="flex-row items-center mb-3">
+        
+        {/* DYNAMIC AVATAR: Shows image if it exists, otherwise falls back to initial */}
+        {review.author_details?.avatar_path ? (
+          <Image 
+            source={{ 
+              uri: review.author_details.avatar_path.startsWith('/http') 
+                ? review.author_details.avatar_path.substring(1) 
+                : `https://image.tmdb.org/t/p/w200${review.author_details.avatar_path}` 
+            }} 
+            className="w-10 h-10 rounded-full mr-3 bg-surface"
+            resizeMode="cover"
+          />
+        ) : (
+          <View className="w-10 h-10 bg-[#1A2235] rounded-full items-center justify-center mr-3">
+            <Text className="text-[#00E5FF] font-bold text-lg">
+              {review.author ? review.author.charAt(0).toUpperCase() : '?'}
+            </Text>
+          </View>
+        )}
+
+        <View className="flex-1">
+          <Text className="text-primaryText font-bold text-base">{review.author}</Text>
+          {review.author_details?.rating && (
+            <View className="flex-row items-center mt-0.5">
+              <Ionicons name="star" size={12} color="#00E5FF" />
+              <Text className="text-[#8899B6] text-xs ml-1 font-bold">{review.author_details.rating} / 10</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      <Text className="text-[#8899B6] text-sm leading-6">{review.content}</Text>
+    </View>
+  ))}
+</ScrollView>
           </View>
         </View>
       </Modal>

@@ -53,6 +53,28 @@ export const uploadAvatarToServer = async (token: string, imageUri: string) => {
   return data.user; // The backend returns the updated user object
 };
 
+
+// Add this to your services.ts file
+export const fetchMediaList = async (endpointPath: string) => {
+  try {
+    // This directly hits endpoints like '/movie/popular' or '/tv/top_rated'
+    const response = await fetch(`${tmdb_config.baseUrl}${endpointPath}`, {
+      headers: tmdb_config.headers
+    });
+
+    if (!response.ok) {
+      throw new Error(`TMDB API Error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.results; 
+
+  } catch (error) {
+    console.error(`Error fetching media list for ${endpointPath}:`, error);
+    throw error; 
+  }
+};
+
 export const fetchMovies = async (query?: string) => {
   try {
     // 1. Switch to 'multi' search and 'trending/all'
@@ -124,6 +146,20 @@ export const fetchGenres = async (type: 'movie' | 'tv' = 'movie') => {
 
   } catch (error) {
     console.error(`Error fetching ${type} genres:`, error);
+    throw error;
+  }
+};
+
+// Fetches movies that belong to a specific Genre ID
+export const fetchMediaByGenre = async (genreId: number, type: 'movie' | 'tv' = 'movie') => {
+  try {
+    const response = await fetch(`${tmdb_config.baseUrl}/discover/${type}?with_genres=${genreId}&sort_by=popularity.desc`, {
+      headers: tmdb_config.headers
+    });
+    const data = await response.json();
+    return data.results;
+  } catch (error) {
+    console.error(`Error fetching media by genre ${genreId}:`, error);
     throw error;
   }
 };
