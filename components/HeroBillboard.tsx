@@ -75,7 +75,7 @@ const HeroBillboard = ({ movies }: { movies: any[] }) => {
                 
                 <View>
                   <Text 
-                    className="text-white text-4xl font-black text-center mb-4 tracking-tight" 
+                    className="text-accent text-4xl font-black text-center mb-4 tracking-tight" 
                     numberOfLines={2}
                   >
                     {item.title || item.name}
@@ -100,7 +100,7 @@ const HeroBillboard = ({ movies }: { movies: any[] }) => {
                   {/* Primary Play Button - kept white for high contrast tap action */}
                   <Pressable
                     onPress={() => router.push({ pathname: '/movies/[id]', params: { id: item.id, type: item.media_type || 'movie' } })}
-                    className="flex-1 bg-white flex-row items-center justify-center py-3.5 rounded-xl shadow-lg"
+                    className="flex-1 bg-accent flex-row items-center justify-center py-3.5 rounded-xl shadow-lg"
                     style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
                   >
                     <Ionicons name="play" size={22} color="black" />
