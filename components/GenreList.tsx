@@ -28,23 +28,34 @@ const GenreList = () => {
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
-            // FIXED: Removed negative paddingTop. Added actual padding for alignment.
             contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 10, gap: 10 }}
           >
+            {/* The "All" Button */}
             <Pressable 
               onPress={() => setSelectedGenre(null)}
-              className={`px-5 py-2 rounded-full border ${selectedGenre === null ? 'bg-[#00E5FF] border-[#00E5FF]' : 'bg-surface border-[#1A2235]'}`}
+              className={`px-5 py-2 rounded-full border ${
+                selectedGenre === null 
+                  ? 'bg-[#00E5FF] border-[#00E5FF]' 
+                  : 'bg-surface/50 border-white/10' // Softer dark aesthetic
+              }`}
             >
-              <Text className={`font-bold ${selectedGenre === null ? 'text-black' : 'text-primaryText'}`}>All</Text>
+              <Text className={`font-bold ${selectedGenre === null ? 'text-black' : 'text-white/70'}`}>
+                All
+              </Text>
             </Pressable>
 
+            {/* Dynamic Genre Buttons */}
             {genres.map((genre: any) => (
               <Pressable 
                 key={genre.id}
                 onPress={() => setSelectedGenre(genre.id)}
-                className={`px-5 py-2 rounded-full border ${selectedGenre === genre.id ? 'bg-[#00E5FF] border-[#00E5FF]' : 'bg-surface border-[#1A2235]'}`}
+                className={`px-5 py-2 rounded-full border ${
+                  selectedGenre === genre.id 
+                    ? 'bg-[#00E5FF] border-[#00E5FF]' 
+                    : 'bg-surface/50 border-white/10' // Softer dark aesthetic
+                }`}
               >
-                <Text className={`font-bold ${selectedGenre === genre.id ? 'text-black' : 'text-primaryText'}`}>
+                <Text className={`font-bold ${selectedGenre === genre.id ? 'text-black' : 'text-white/70'}`}>
                   {genre.name}
                 </Text>
               </Pressable>
@@ -55,19 +66,19 @@ const GenreList = () => {
 
       {/* RESULTS GRID (Only shows if a genre is selected) */}
       {selectedGenre !== null && (
-        <View className="px-5">
+        <View className="px-5 mt-4">
           {genreMoviesLoading ? (
-             <ActivityIndicator size="large" color="#00E5FF" className="mt-10" />
+             <ActivityIndicator size="large" color="#00E5FF" className="mt-10 mb-20" />
           ) : (
             <FlatList 
-              data={genreMovies}
+              data={genreMovies.slice(0, 12)} // Limiting to 12 so it doesn't make the page infinitely long!
               keyExtractor={(item) => item.id.toString()}
               numColumns={3}
-              scrollEnabled={false} // Since this is inside a ScrollView on the Home page
+              scrollEnabled={false} 
               columnWrapperStyle={{ gap: 12 }} 
               contentContainerStyle={{ gap: 16, paddingBottom: 20 }}
               renderItem={({ item }) => (
-                 <View className="flex-1  ">
+                 <View className="flex-1">
                    <MovieCard {...item} media_type="movie" />
                  </View>
               )}

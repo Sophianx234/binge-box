@@ -2,27 +2,22 @@ import { View, Text, Pressable } from 'react-native';
 import React from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import GenreList from './GenreList';
 
 const SearchBar = () => {
   const router = useRouter();
   
   return (
-    // Ensure the container doesn't restrict height
-    <View className="bg-background pt-2 w-full">
-      {/* 1. SEARCH PILL */}
+    <View className="pt-2 w-full bg-transparent">
       <Pressable 
         onPress={() => router.push('/search')}
-        className="flex-row items-center mx-5 bg-surface rounded-full px-6 py-4 mb-4 border border-[#1A2235]"
+        // Adjusted padding (py-3) to make it slightly more compact and premium
+        className="flex-row items-center bg-black/50 rounded-full mx-5 px-5 py-3 mb-2 border border-white/10"
       >
-        <Ionicons name="search" size={20} color="#00E5FF" />
-        <Text className="flex-1 ml-3 text-[#8899B6] text-base">
+        <Ionicons name="search" size={18} color="#00E5FF" />
+        <Text className="flex-1 ml-3 text-white/70 text-sm font-medium tracking-wide">
           Search movies, shows...
         </Text>
       </Pressable>
-
-      {/* 2. GENRE LIST */}
-      <GenreList />
     </View>
   );
 }

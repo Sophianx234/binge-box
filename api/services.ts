@@ -57,12 +57,13 @@ export const uploadAvatarToServer = async (token: string, imageUri: string) => {
 // Add this to your services.ts file
 export const fetchMediaList = async (endpointPath: string) => {
   try {
-    // This directly hits endpoints like '/movie/popular' or '/tv/top_rated'
     const response = await fetch(`${tmdb_config.baseUrl}${endpointPath}`, {
       headers: tmdb_config.headers
     });
 
     if (!response.ok) {
+      // If it's a 404, just return an empty array silently!
+      if (response.status === 404) return [];
       throw new Error(`TMDB API Error: ${response.status}`);
     }
 
@@ -70,7 +71,8 @@ export const fetchMediaList = async (endpointPath: string) => {
     return data.results; 
 
   } catch (error) {
-    console.error(`Error fetching media list for ${endpointPath}:`, error);
+    // Only log actual network crashes, not missing trailers
+    console.error(`Network Error fetching ${endpointPath}:`, error);
     throw error; 
   }
 };
