@@ -8,7 +8,8 @@ const SearchBar = () => {
   const router = useRouter();
   
   return (
-    <View className="bg-background pt-2">
+    // Ensure the container doesn't restrict height
+    <View className="bg-background pt-2 w-full">
       {/* 1. SEARCH PILL */}
       <Pressable 
         onPress={() => router.push('/search')}
@@ -20,7 +21,7 @@ const SearchBar = () => {
         </Text>
       </Pressable>
 
-      {/* 2. GENRE LIST (Now sits directly underneath) */}
+      {/* 2. GENRE LIST */}
       <GenreList />
     </View>
   );

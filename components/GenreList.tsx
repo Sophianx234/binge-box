@@ -1,42 +1,35 @@
 import React, { useState } from 'react';
-// 1. FIXED: Added missing ActivityIndicator, Pressable, and FlatList imports
 import { View, Text, ScrollView, ActivityIndicator, Pressable, FlatList } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { fetchGenres, fetchMediaByGenre } from '@/api/services';
-import MovieCard from './MovieCard'; // Make sure this path points to your MovieCard!
+import MovieCard from './MovieCard'; 
 
 const GenreList = () => {
   const [selectedGenre, setSelectedGenre] = useState<number | null>(null);
 
-  // Fetch the list of Movie Genres for the top bar
   const { data: genres = [], isLoading: genresLoading } = useQuery({
     queryKey: ['genres', 'movie'],
     queryFn: () => fetchGenres('movie'),
   });
 
-  // Fetch movies specifically for the selected genre
   const { data: genreMovies = [], isLoading: genreMoviesLoading } = useQuery({
     queryKey: ['genreMovies', selectedGenre],
     queryFn: () => fetchMediaByGenre(selectedGenre as number, 'movie'),
-    enabled: selectedGenre !== null, // Only run this if a genre is actually clicked!
+    enabled: selectedGenre !== null,
   });
 
   return (
-    <View className="   ">
-      
-      {/* HEADER */}
-      
-
+    <View>
       {/* GENRE FILTER BAR */}
-      <View className="">
+      <View className="mb-2">
         {genresLoading ? (
           <ActivityIndicator color="#00E5FF" />
         ) : (
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={{ paddingHorizontal: 20,paddingTop:-40, gap: 10 }}
+            // FIXED: Removed negative paddingTop. Added actual padding for alignment.
+            contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 10, gap: 10 }}
           >
             <Pressable 
               onPress={() => setSelectedGenre(null)}
@@ -59,11 +52,10 @@ const GenreList = () => {
           </ScrollView>
         )} 
       </View> 
-      {/* 2. FIXED: Properly closed the ternary operator and the View container */}
 
-      {/* 3. FIXED: Actually render the grid of movies when a genre is selected! */}
-      {selectedGenre !== null ? (
-        <View className="flex-1 px-5">
+      {/* RESULTS GRID (Only shows if a genre is selected) */}
+      {selectedGenre !== null && (
+        <View className="px-5">
           {genreMoviesLoading ? (
              <ActivityIndicator size="large" color="#00E5FF" className="mt-10" />
           ) : (
@@ -71,23 +63,18 @@ const GenreList = () => {
               data={genreMovies}
               keyExtractor={(item) => item.id.toString()}
               numColumns={3}
-              showsVerticalScrollIndicator={false}
+              scrollEnabled={false} // Since this is inside a ScrollView on the Home page
               columnWrapperStyle={{ gap: 12 }} 
-              contentContainerStyle={{ gap: 16, paddingBottom: 40 }}
+              contentContainerStyle={{ gap: 16, paddingBottom: 20 }}
               renderItem={({ item }) => (
-                 <View className="flex-1 max-w-[31%]">
+                 <View className="flex-1  ">
                    <MovieCard {...item} media_type="movie" />
                  </View>
               )}
             />
           )}
         </View>
-      ) : (
-        <View className="flex-1 justify-center items-center">
-           <Text className="text-[#8899B6]">Select a genre above or add your MovieRows here!</Text>
-        </View>
       )}
-
     </View>
   );
 };
