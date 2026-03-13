@@ -345,3 +345,37 @@ export const getFavoriteMovies = async (token: string) => {
   
   return data;
 };
+
+
+
+// Fetches their biography, birthday, and high-res image
+export const fetchPersonDetails = async (personId: string | number) => {
+  const res = await fetch(`${tmdb_config.baseUrl}/person/${personId}`, {
+    method: 'GET', 
+    headers: tmdb_config.headers, 
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.status_message || data.error || 'Failed to fetch person details');
+  }
+
+  return data;
+};
+
+// Fetches the movies they are famous for acting in
+export const fetchPersonCredits = async (personId: string | number) => {
+  const res = await fetch(`${tmdb_config.baseUrl}/person/${personId}/combined_credits`, {
+    method: 'GET', 
+    headers: tmdb_config.headers, 
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(data.status_message || data.error || 'Failed to fetch person credits');
+  }
+
+  return data.cast; 
+};
