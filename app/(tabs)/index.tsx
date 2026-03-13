@@ -15,6 +15,10 @@ import ComingSoonRow from '@/components/ComingSoonRow';
 import BecauseYouWatchedRow from '@/components/BecauseYouWatchedRow';
 import GenreList from '@/components/GenreList'; 
 import TrendingStarsRow from '@/components/TrendingStarRow';
+import MyListRow from '@/components/MyListRow';
+import TimeContextRow from '@/components/TimeContextRow';
+import ShortsRow from '@/components/ShortsRow';
+import LiveChannelsRow from '@/components/LiveChannelRow';
 
 export default function Home() {
   const insets = useSafeAreaInsets();
@@ -95,12 +99,15 @@ export default function Home() {
             <View className="mt-6 mb-2">
               <GenreList />
             </View>
-
+<MyListRow movies={trending.slice(4, 9)} />
+<TimeContextRow/>
             <View className="flex-col gap-y-4">
               {trending.length > 1 && <ContinueWatchingRow data={trending.slice(1, 6)} />}
               {trending.length > 0 && <TopTenRow data={trending} />}
               <StudioHubs />
               <TrendingStarsRow />
+              <ShortsRow />
+              <LiveChannelsRow />
               <ComingSoonRow />
               
               {trending.length > 2 && (
