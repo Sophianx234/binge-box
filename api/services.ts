@@ -379,3 +379,81 @@ export const fetchPersonCredits = async (personId: string | number) => {
 
   return data.cast; 
 };
+
+
+
+// ==========================================
+// WATCH PROGRESS SERVICES
+// ==========================================
+
+// 1. Fetch the "Continue Watching" list for the home screen
+export const getContinueWatching = async (token: string) => {
+  const response = await fetch(`${url}/watch/continue`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch continue watching list');
+  }
+
+  return response.json();
+};
+
+// 2. Log progress while the video is playing
+export const logWatchProgress = async (token: string, progressData: {
+  tmdbId: number;
+  mediaType: string;
+  title: string;
+  posterPath: string | null;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  stoppedAtSeconds: number;
+  totalDurationSeconds?: number;
+}) => {
+  const response = await fetch(`${url}/watch/progress`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(progressData),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to log watch progress');
+  }
+
+  return response.json();
+};
+
+// 3. Fetch exact progress for a specific video (to resume playback)
+export const getSpecificProgress = async (
+  token: string, 
+  tmdbId: number, 
+  season?: number, 
+  episode?: number
+) => {
+  // Construct the URL with optional query params for TV shows
+  let base = `${url}/watch/progress/${tmdbId}`;
+  if (season && episode) {
+    base += `?season=${season}&episode=${episode}`;
+  }
+
+  const response = await fetch(base, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch specific progress');
+  }
+
+  return response.json();
+};

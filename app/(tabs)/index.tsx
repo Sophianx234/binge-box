@@ -147,7 +147,7 @@ export default function Home() {
             </View>
           )}
 
-          <View className="mt-6 mb-2">
+          <View className="mt-6 ">
             <GenreList />
           </View>
           

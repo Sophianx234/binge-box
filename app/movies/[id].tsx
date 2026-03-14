@@ -174,13 +174,17 @@ export default function MovieDetailScreen() {
   }, []);
 
   const handlePlayMovieAction = () => {
-    const mediaId = movie?.imdb_id || movie?.id;
-    if (!mediaId) {
-      Alert.alert("Not Available", "This media is not currently available to stream.");
-      return;
-    }
+    const mediaId = movie?.imdb_id || movie?.id; // Keep this for Vidsrc
+    if (!mediaId) return;
 
-    const playParams: any = { type, id: mediaId };
+    const playParams: any = { 
+      type: type, 
+      id: mediaId,               // Vidsrc uses this (might be "tt1234")
+      tmdbId: movie.id,          // <-- NEW: Your backend strictly uses this (e.g., 550)
+      title: movie.title || movie.name,
+      posterPath: movie.poster_path,
+      runtime: movie.runtime || movie.episode_run_time?.[0] || 0
+    };
     
     if (type === 'tv') {
       playParams.season = selectedSeason;
